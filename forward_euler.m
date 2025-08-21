@@ -1,9 +1,16 @@
-function return_data = forward_euler(initial_conditions,time_step,s1,s2,r1,r2)
+function return_data = forward_euler(ic,dt,t_final,s1,s2,r1,r2)
 
-    %for i in np.arange(steps-1)+1:
-    %t[i] = t[i-1] + dt
-    %y[i,:] = forwards_euler(e,s,r,y[i-1,:],t,dt,derivative) % 1
+    steps = round(t_final/dt + 1);
 
-    return_data = initial_conditions+time_step+s1+s2+r1+r2;
+    time = zeros([1,steps]);
+    data = zeros([length(ic),steps]);
+    data(:,1) = ic;
+
+    for step = 2:steps
+        time(step) = time(step-1) + dt;
+        data(:,step) = mod(data(:,step-1) + derivative(s1,s2,r1,r2,data(step-1)),1);
+    end
+
+    return_data = [time, data];
 
 end
