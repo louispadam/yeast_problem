@@ -1,4 +1,4 @@
-function [return_time, return_data] = forward_euler(ic,params)
+function [return_time, return_data] = forward_euler_noise(ic,params)
 
     dt = params.dt;
     t_final = params.tfin;
@@ -11,7 +11,7 @@ function [return_time, return_data] = forward_euler(ic,params)
 
     for step = 2:steps
         time(step) = time(step-1) + dt;
-        data(:,step) = mod(data(:,step-1) + dt*derivative(params,data(:,step-1)),1);
+        data(:,step) = mod(data(:,step-1) + dt*derivative_noise(params,data(:,step-1)),1);
     end
 
     return_time = time;

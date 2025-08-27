@@ -3,6 +3,9 @@ function return_data = animate(x,y,params,names,pn)
     dt=params.dt; % time step
     tmax = params.tfin;
 
+    names(1)
+    names(2)
+
     tt=0;
     ptfac=params.fr;   % 1/animation rate
 

@@ -18,9 +18,6 @@ function return_data = frame(x,y,params,names,pn,ind,tt)
     b1 = params.r2;
     del = params.del;
 
-    ChiR = 0.25*(tanh((x-b0)/del)+1).*(tanh((b1-x)/del)+1);
-    ChiS = 0.25*(tanh((x-a0)/del)+1).*(tanh((a1-x)/del)+1);
-
     figure(pn)
     clf
     hold on
@@ -34,6 +31,9 @@ function return_data = frame(x,y,params,names,pn,ind,tt)
     end
     m = max(y(:,ind,:),[],"all");
 
+    ChiR = 1.1*m*0.25*(tanh(4*pi*(x-b0)/del)+1).*(tanh(4*pi*(b1-x)/del)+1);
+    ChiS = 1.1*m*0.25*(tanh(4*pi*(x-a0)/del)+1).*(tanh(4*pi*(a1-x)/del)+1);
+
     %si = size(y);
     %if si(2) > 1
     %    for k = 1:si(2)
@@ -46,8 +46,8 @@ function return_data = frame(x,y,params,names,pn,ind,tt)
     %    m = max(y);
     %end
 
-    plot(x,ChiR,'r.','linewidth',3)
-    plot(x,ChiS,'k-','linewidth',3)
+    plot(x,ChiR,'r-','linewidth',3,'DisplayName','responsive')
+    plot(x,ChiS,'k-','linewidth',3,'DisplayName','signaling')
 
     %axis([-L L 0 m.*1.1])
     axis([0 1 0 m.*1.1]);
