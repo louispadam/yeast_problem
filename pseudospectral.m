@@ -1,4 +1,14 @@
-function [return_time, return_data]=pseudospectral(ic,params)
+function [return_time, return_data]=pseudospectral(initial,parameters)
+%PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
+%techniques
+arguments
+    initial (1,:)       % initial conditions
+    parameters struct   % parameters for simulation
+end
+
+    % Collect Inputs
+    ic = initial;
+    params = parameters;
 
     %****************************
     % System Parameters
@@ -23,18 +33,21 @@ function [return_time, return_data]=pseudospectral(ic,params)
     kvec=fftshift(-Nh:Nh-1); kvec=kvec.'; % correction vector of positions to
                                       % match MatLab Fourier convention
     kx=kvec/2;               % ???
+    kx = kx.';
 
     %****************************
     % Define characteristic functions
     %***************************
     ChiR = 0.25*(tanh((X-b0)/del)+1).*(tanh((b1-X)/del)+1);
+    ChiR = ChiR.';
     ChiS = 0.25*(tanh((X-a0)/del)+1).*(tanh((a1-X)/del)+1);
+    ChiS = ChiS.';
     ChiP = 0.25*(tanh((X-c0)/del)+1).*(tanh((c1-X)/del)+1); % region where we restore positivity
+    ChiP = ChiP.';
 
     %***************************************************
     % Start Iterations
     %**************************************************
-
     h=params.dt;
     t_final = params.tfin;
     Symb=1+h*(eps^2*kx.^2*8*pi^2+1i*kx*4*pi);
@@ -42,10 +55,12 @@ function [return_time, return_data]=pseudospectral(ic,params)
     U=ic;
     tt=0;
 
-    time = [tt];
-    data = U;
+    steps = round(t_final/h + 1);
+    time = zeros([1,steps]);
+    data = zeros([steps,length(ic)]);
+    data(1,:) = ic;
 
-    while (tt+h<t_final)
+    for step = 2:steps
         Uh=fft(U);
         URh=fft(U.*ChiR);
         PS=trapz(X,ChiS.*U)/2/L;   % interaction term (but normalized???)
@@ -56,10 +71,11 @@ function [return_time, return_data]=pseudospectral(ic,params)
 
         tt=tt+h;
 
-        time = cat(1,time,[tt]);
-        data = cat(2,data,U);
+        time(step) = tt;
+        data(step,:) = U;
+
     end
 
     return_time = time;
-    return_data = data.';
+    return_data = data;
 end

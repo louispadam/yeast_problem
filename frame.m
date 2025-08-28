@@ -1,59 +1,93 @@
-function return_data = frame(x,y,params,names,pn,ind,tt)
+function return_data = frame(x_data,y_data,parameters,fig_num,options)
+%FRAME Animate a collection of simulations.
+arguments (Input)
+    x_data (1,:) double     % discretization of domain
+    y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
+    parameters struct       % parameters used for simulation
+    fig_num                 % figure to plot in
+end
+arguments (Input)
+    options.Names (1,:) string = []         % names of FIRST FEW curves
+    options.Colors (:,3) double = []        % colors of FIRST FEW curves
+    options.Regions logical = false         % show regions?
+    options.Region_labels logical = false   % add regions to legend?
+    options.Time = 0                        % time point of simulation
+    options.Index = 1                       % time step of simulation
+end
 
-    if (nargin<6)
-        ind = 1;
-        tt = 0;
-    end
+    %****************************
+    % Collect Inputs
+    %****************************
+    x = x_data;
+    y = y_data;
+    params = parameters;
+    fn = fig_num;
 
-    %L=2*pi;
-    %a0=params.s1*2*L-L;
-    %a1=params.s2*2*L-L;
-    %b0=params.r1*2*L-L;
-    %b1=params.r2*2*L-L;
-    %del=params.del;
+    names = options.Names;
+    colors = options.Colors;
+    reg = options.Regions;
+    regl = options.Region_labels;
+    tt = options.Time;
+    ind = options.Index;
 
+    % Define Spatial Parameters
     a0 = params.s1;
     a1 = params.s2;
     b0 = params.r1;
     b1 = params.r2;
     del = params.del;
 
-    figure(pn)
+    %****************************
+    % Construct Figures
+    %****************************
+    figure(fn)
     clf
     hold on
 
-    colors = ['b','g','r','m','y'];
-
     si = size(y);
+    ci = size(colors);
     for k = 1:si(1)
         u = squeeze(y(k,ind,:));
-        plot(x,u,colors(k),'lineWidth',3,'DisplayName',names(k))
+        if k <= length(names)
+            if k <= ci(1)
+                % Associate specific name and color
+                plot(x,u,'lineWidth',3,'DisplayName',names(k),'Color',colors(k,:))
+            else
+                % Associate specific name
+                plot(x,u,'lineWidth',3,'DisplayName',names(k)) 
+            end
+        elseif k <= ci(1)
+            % Associate specific color
+            temp = plot(x,u,'lineWidth',3,'Color',colors(k,:));
+            set(get(get(temp, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
+        else
+            % Associate neither name nor color
+            temp = plot(x,u,'lineWidth',3);
+            set(get(get(temp, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
+        end
     end
+    
+    % Determine upper bound of figure
     m = max(y(:,ind,:),[],"all");
 
     ChiR = 1.1*m*0.25*(tanh(4*pi*(x-b0)/del)+1).*(tanh(4*pi*(b1-x)/del)+1);
     ChiS = 1.1*m*0.25*(tanh(4*pi*(x-a0)/del)+1).*(tanh(4*pi*(a1-x)/del)+1);
 
-    %si = size(y);
-    %if si(2) > 1
-    %    for k = 1:si(2)
-    %        u = y(ind,k,:);
-    %        plot(x,u,'b','linewidth',3)
-    %    end
-    %    m = max(1,y(ind,:,:));
-    %else
-    %    plot(x,y(ind,1,:),'b','linewidth',3)
-    %    m = max(y);
-    %end
+    if reg
+        temp1 = plot(x,ChiR,'r-','linewidth',3,'DisplayName','responsive');
+        temp2 = plot(x,ChiS,'k-','linewidth',3,'DisplayName','signaling');
+        if ~regl
+            set(get(get(temp1, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
+            set(get(get(temp2, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
+        end
+    end
 
-    plot(x,ChiR,'r-','linewidth',3,'DisplayName','responsive')
-    plot(x,ChiS,'k-','linewidth',3,'DisplayName','signaling')
-
-    %axis([-L L 0 m.*1.1])
     axis([0 1 0 m.*1.1]);
     tlt=sprintf('Time =%2.5g',tt);
+    ylabel('Density');
+    xlabel('Position');
     title(tlt,'Fontsize',18)
-    legend()
+    legend show
 
     return_data = 1;
 
