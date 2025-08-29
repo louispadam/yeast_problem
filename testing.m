@@ -1,5 +1,6 @@
-%% Instantiate parameter structure
+%% Boilerplate
 
+% Instantiate Parameter Structure
 parameters = struct('s1',0, ...     % beginning of signalling region
                     's2',0.3, ...   % end of signalling region
                     'r1',0.4, ...   % beginning of responsive region
@@ -11,6 +12,9 @@ parameters = struct('s1',0, ...     % beginning of signalling region
                     'alph',0.9, ... % linear inhibition term
                     'fr',2, ...     % frame rate
                     'pr',1);        % pause rate
+
+% Add subdirectories to path
+addpath(genpath(pwd));
 
 %%
 
