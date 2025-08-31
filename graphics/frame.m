@@ -1,8 +1,10 @@
-function return_data = frame(x_data,y_data,parameters,fig_num,options)
+function return_data = frame(x_data,parameters,fig_num,options)
 %FRAME Animate a collection of simulations.
+%
+%last updated 08/30/25
 arguments (Input)
     x_data (1,:) double     % discretization of domain
-    y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
+    %y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
     parameters struct       % parameters used for simulation
     fig_num                 % figure to plot in
 end
@@ -13,13 +15,16 @@ arguments (Input)
     options.Region_labels logical = false   % add regions to legend?
     options.Time = 0                        % time point of simulation
     options.Index = 1                       % time step of simulation
+    options.Continuous = []
+    options.Discrete = []
+    options.Thickness = []
 end
 
     %****************************
     % Collect Inputs
     %****************************
     x = x_data;
-    y = y_data;
+    %y = y_data;
     params = parameters;
     fn = fig_num;
 
@@ -29,6 +34,9 @@ end
     regl = options.Region_labels;
     tt = options.Time;
     ind = options.Index;
+    ps = options.Continuous;
+    pp = options.Discrete;
+    pt = options.Thickness;
 
     % Define Spatial Parameters
     a0 = params.s1;
@@ -36,6 +44,20 @@ end
     b0 = params.r1;
     b1 = params.r2;
     del = params.del;
+
+    %****************************
+    % Compile Data
+    %****************************
+    
+    ps_s = size(ps);
+    pp_s = size(pp);
+
+    y = zeros(pp_s(1)+ps_s(1),1,ps_s(3));
+    y(1:ps_s(1),1,:) = ps(:,ind,:);
+
+    for k = 1:pp_s(1)
+        y(ps_s(1)+k,1,:) = fatten_points_polynomial(x,reshape(pp(k,ind,:),[1,pp_s(3)]),pt(k));
+    end
 
     %****************************
     % Construct Figures
@@ -47,7 +69,8 @@ end
     si = size(y);
     ci = size(colors);
     for k = 1:si(1)
-        u = squeeze(y(k,ind,:));
+        u = reshape(y(k,1,:),[1,si(3)]);
+        %u = squeeze(y(k,ind,:));
         if k <= length(names)
             if k <= ci(1)
                 % Associate specific name and color
@@ -68,14 +91,14 @@ end
     end
     
     % Determine upper bound of figure
-    m = max(y(:,ind,:),[],"all");
+    m = max(y(:,1,:),[],"all");
 
     ChiR = 1.1*m*0.25*(tanh(4*pi*(x-b0)/del)+1).*(tanh(4*pi*(b1-x)/del)+1);
     ChiS = 1.1*m*0.25*(tanh(4*pi*(x-a0)/del)+1).*(tanh(4*pi*(a1-x)/del)+1);
 
     if reg
-        temp1 = plot(x,ChiR,'r-','linewidth',3,'DisplayName','responsive');
-        temp2 = plot(x,ChiS,'k-','linewidth',3,'DisplayName','signaling');
+        temp1 = plot(x,ChiR,'-','Color',[192,192,192]/255,'linewidth',3,'DisplayName','responsive');
+        temp2 = plot(x,ChiS,'-','Color',[128,128,128]/255,'linewidth',3,'DisplayName','signaling');
         if ~regl
             set(get(get(temp1, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
             set(get(get(temp2, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');

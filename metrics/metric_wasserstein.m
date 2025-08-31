@@ -1,5 +1,7 @@
 function return_data = metric_wasserstein(dis_y,cont_x,cont_y)
-    
+%
+%last updated 08/30/25 by Adam Petrucci
+
     % metric_wasserstein is not ready
     disp('WARNING: metric_wasserstein is not ready')
 

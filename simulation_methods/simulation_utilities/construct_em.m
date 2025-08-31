@@ -1,6 +1,8 @@
 function return_data = construct_em(x_data,y_data,num_points)
 %CONSTRUCT_EM Sample a given probability distribution to construc an
 %approximating empirical measure.
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments (Input)
     x_data (1,:) double % discretization of domain for y_data
     y_data (1,:) double % distribution to be sampled from

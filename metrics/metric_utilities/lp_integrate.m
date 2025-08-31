@@ -1,5 +1,7 @@
 function return_data = lp_integrate(x_data,y_data,q)
 %LP_INTEGRATE integrates using the trapezoidal method
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments
     x_data (1,:)    % discretization of domain
     y_data (1,:)    % function values

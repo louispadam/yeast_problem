@@ -1,6 +1,8 @@
 function return_data = fatten_points_polynomial(domain,averages,std_dev)
 %FATTEN_POINTS_POLYNOMIAL produces a continuous distribution from an
 %empirical one using C^1 polynomial bumps
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments (Input)
     domain (1,:)    % domain on which to fatten
     averages (1,:)  % points to fatten

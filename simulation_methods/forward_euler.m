@@ -1,5 +1,7 @@
 function [return_time, return_data] = forward_euler(initial,parameters)
 %FORWARD_EULER simulates the yeast NODE using a forward-euler algorithm.
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation

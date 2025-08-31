@@ -1,6 +1,8 @@
 function [return_time, return_data]=pseudospectral(initial,parameters)
 %PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
 %techniques
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation

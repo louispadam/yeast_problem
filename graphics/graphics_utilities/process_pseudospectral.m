@@ -2,6 +2,10 @@ function return_data = process_pseudospectral(domain,time,data)
 %PROCESS_PSEUDOSPECTRAL takes data from the pseudospectral
 %method and transforms it for the purposes of the animate or frame
 %graphical methods
+%
+%NOTE: THIS METHOD IS UNNECESSARY THANKS TO THE BUILT-IN RESHAPE METHOD
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments
     domain (1,:)    % discretization of domain
     time (1,:)      % time steps in simulation

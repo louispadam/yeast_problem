@@ -1,5 +1,7 @@
 function return_data = derivative(parameters,curr_state)
 %DERIVATIVE calculates the derivative of a particle assuming linear interaction.
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments (Input)
     parameters struct    % parameters for simulation
     curr_state (1,:)     % current state of the system

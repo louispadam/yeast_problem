@@ -2,6 +2,11 @@ function return_data = process_euler(domain,time,data,std_dev)
 %PROCESS_EULER takes data from the forward_euler or forward_euler_noise
 %methods and transforms it for the purposes of the animate or frame
 %graphical methods
+%
+%NOTE: THIS METHOD IS UNNECESSARY THANKS TO THE BUILT-IN RESHAPE METHOD
+%       AND DESIGN CHANGE OF 'FRAME.M'
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments
     domain (1,:)    % discretization of domain
     time (1,:)      % time steps in simulation

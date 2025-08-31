@@ -1,8 +1,10 @@
-function return_data = animate(x_data,y_data,parameters,fig_num,options)
+function return_data = animate(x_data,parameters,fig_num,options)
 %ANIMATE Animate a collection of simulations.
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments (Input)
     x_data (1,:) double     % discretization of domain
-    y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
+    %y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
     parameters struct       % parameters used for simulation
     fig_num                 % figure to plot in
 end
@@ -11,13 +13,16 @@ arguments (Input)
     options.Colors (:,3) double = []        % colors of FIRST FEW curves
     options.Regions logical = false         % show regions?
     options.Region_labels logical = false   % add regions to legend?
+    options.Continuous = []
+    options.Discrete = []
+    options.Thickness = []
 end
 
     %****************************
     % Collect Inputs
     %****************************
     x = x_data;
-    y = y_data;
+    %y = y_data;
     params = parameters;
     fn = fig_num;
 
@@ -25,6 +30,9 @@ end
     colors = options.Colors;
     reg = options.Regions;
     regl = options.Region_labels;
+    ps = options.Continuous;
+    pp = options.Discrete;
+    pt = options.Thickness;
 
     %****************************
     % Define Temporal Parameters
@@ -33,7 +41,7 @@ end
     tmax = params.tfin; % ending time
     tt=0;               % current time
     ptfac=params.fr;    % frame rate
-    pp = params.pr;     % pause rate
+    pr = params.pr;     % pause rate
 
     %****************************
     % Run Animation
@@ -47,9 +55,10 @@ end
             ind = floor(tt/dt)+1;
             
             % Display frame for given time
-            frame(x,y,params,fn,'Names',names,'Colors',colors,'Index',ind, ...
-                  'Regions',reg,'Region_labels',regl,'Time',tt);
-            pause(pp)
+            frame(x,params,fn,Names=names,Colors=colors,Index=ind, ...
+                  Regions=reg,Region_labels=regl,Time=tt, ...
+                  Continuous=ps,Discrete=pp,Thickness=pt);
+            pause(pr)
 
         end
         tt=tt+dt; % Update time

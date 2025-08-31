@@ -3,6 +3,8 @@ function return_data = metric_lp_1(discrete_y,continuous_x,continuous_y,q)
 %continuous distribution via the L^p norm by thickening the empirical
 %distriubtion. It takes the infimum over a range of thickness and
 %translations.
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments
     discrete_y (1,:)    % collection of particles in empirical measure
     continuous_x (1,:)  % discretization of continuous distribution

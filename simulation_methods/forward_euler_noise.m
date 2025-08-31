@@ -1,6 +1,8 @@
 function [return_time, return_data] = forward_euler_noise(initial,parameters)
 %FORWARD_EULER_NOISE simulates the yeast NODE with diffusion using a
 %forward-euler algorithm. I believe this is known as Euler-Maruyama
+%
+%last updated 08/30/25 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
