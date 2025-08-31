@@ -2,7 +2,7 @@ function [return_time, return_data]=pseudospectral(initial,parameters)
 %PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
 %techniques
 %
-%last updated 08/30/25 by Adam Petrucci
+%last updated 08/31/25 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
@@ -29,7 +29,7 @@ end
     %******************************
     % Set up Fourier Transform
     %******************************
-    n=10; N=2^n; Nh=N/2;     % number of points
+    N=length(ic); Nh=N/2;     % number of points
     dx=2*L/N;                % distance between points
     X=-L+(0:N-1)*dx; X=X.';  % vector of point positions
     kvec=fftshift(-Nh:Nh-1); kvec=kvec.'; % correction vector of positions to

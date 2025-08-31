@@ -1,7 +1,7 @@
 function return_data = frame(x_data,parameters,fig_num,options)
 %FRAME Animate a collection of simulations.
 %
-%last updated 08/30/25
+%last updated 08/31/25
 arguments (Input)
     x_data (1,:) double     % discretization of domain
     %y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
@@ -52,8 +52,11 @@ end
     ps_s = size(ps);
     pp_s = size(pp);
 
-    y = zeros(pp_s(1)+ps_s(1),1,ps_s(3));
-    y(1:ps_s(1),1,:) = ps(:,ind,:);
+    y = zeros([pp_s(1)+ps_s(1),1,length(x)]);
+
+    if ps_s(1) > 0
+        y(1:ps_s(1),1,:) = ps(:,ind,:);
+    end
 
     for k = 1:pp_s(1)
         y(ps_s(1)+k,1,:) = fatten_points_polynomial(x,reshape(pp(k,ind,:),[1,pp_s(3)]),pt(k));
