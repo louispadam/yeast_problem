@@ -2,7 +2,7 @@ function [return_time, return_data]=pseudospectral(initial,parameters)
 %PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
 %techniques
 %
-%last updated 08/31/25 by Adam Petrucci
+%last updated 10/02/25 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
@@ -40,11 +40,12 @@ end
     %****************************
     % Define characteristic functions
     %***************************
-    ChiR = 0.25*(tanh((X-b0)/del)+1).*(tanh((b1-X)/del)+1);
+    dd2 = del/2; % so that tanh makes jump in approx length del
+    ChiR = 0.25*(tanh((X-b0)/dd2)+1).*(tanh((b1-X)/dd2)+1);
     ChiR = ChiR.';
-    ChiS = 0.25*(tanh((X-a0)/del)+1).*(tanh((a1-X)/del)+1);
+    ChiS = 0.25*(tanh((X-a0)/dd2)+1).*(tanh((a1-X)/dd2)+1);
     ChiS = ChiS.';
-    ChiP = 0.25*(tanh((X-c0)/del)+1).*(tanh((c1-X)/del)+1); % region where we restore positivity
+    ChiP = 0.25*(tanh((X-c0)/dd2)+1).*(tanh((c1-X)/dd2)+1); % region where we restore positivity
     ChiP = ChiP.';
 
     %***************************************************

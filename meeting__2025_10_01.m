@@ -1,3 +1,11 @@
+%% 10/01/2025
+%
+% This script is for a research meeting with Keith Promislow. It is
+% intended to compare simulation results as the number of particles
+% increases.
+%
+% last updated 10/02/25 by Adam Petrucci
+
 %% Boilerplate
 
 % Instantiate Parameter Structure
