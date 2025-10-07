@@ -20,10 +20,16 @@ end
     eps = params.eps;
     dt = params.dt;
     alph = params.alph;
+    ct = params.ct;
+
+    ChiR = ct(r1,r2);
+    ChiS = ct(s1,s2);
 
     % Calculate Derivative
-    mass_active = sum((s1<state).*(state<s2))/length(state);
+    mass_active = sum(ChiS(state))/length(state);
+    %mass_active = sum((s1<state).*(state<s2))/length(state);
     noise = sqrt(2*dt)*eps*rand([1,length(state)]);
-    return_data = 1+influence(mass_active,alph).*(r1<state).*(state<r2)+noise;
+    return_data = 1+influence(mass_active,alph).*ChiR(state)+noise;
+    %return_data = 1+influence(mass_active,alph).*(r1<state).*(state<r2)+noise;
 
 end

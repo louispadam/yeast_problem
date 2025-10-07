@@ -2,7 +2,7 @@ function [return_time, return_data]=pseudospectral(initial,parameters)
 %PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
 %techniques
 %
-%last updated 10/02/25 by Adam Petrucci
+%last updated 10/06/25 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
@@ -25,6 +25,7 @@ end
     del=params.del;     % for defining characteristic function via tanh
     eps=params.eps;     % diffusion coefficient
     alpha=params.alph;  % term in linear influence
+    ct=params.ct;
 
     %******************************
     % Set up Fourier Transform
@@ -41,12 +42,22 @@ end
     % Define characteristic functions
     %***************************
     dd2 = del/2; % so that tanh makes jump in approx length del
-    ChiR = 0.25*(tanh((X-b0)/dd2)+1).*(tanh((b1-X)/dd2)+1);
+    
+    c_ChiR = ct(b0,b1);
+    ChiR = c_ChiR(X);
     ChiR = ChiR.';
-    ChiS = 0.25*(tanh((X-a0)/dd2)+1).*(tanh((a1-X)/dd2)+1);
+
+    c_ChiS = ct(a0,a1);
+    ChiS = c_ChiS(X);
     ChiS = ChiS.';
-    ChiP = 0.25*(tanh((X-c0)/dd2)+1).*(tanh((c1-X)/dd2)+1); % region where we restore positivity
+
+    c_ChiP = ct(c0,c1);
+    ChiP = c_ChiP(X);
     ChiP = ChiP.';
+
+    %ChiR = 0.25*(tanh((X-b0)/dd2)+1).*(tanh((b1-X)/dd2)+1);
+    %ChiS = 0.25*(tanh((X-a0)/dd2)+1).*(tanh((a1-X)/dd2)+1);
+    %ChiP = 0.25*(tanh((X-c0)/dd2)+1).*(tanh((c1-X)/dd2)+1); % region where we restore positivity
 
     %***************************************************
     % Start Iterations
