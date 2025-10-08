@@ -10,9 +10,15 @@
 % end
 
 % this function has issues, but I think they're about machine accuracy, not
-% a math error in the design
+% a math error in the design. I made need to do something mildly clever to have it
+% calculate
 
 function return_data = ct_exp(d)
+%CT_EXP sets the framework for defining a bump function
+%It is exponential, has bounded support, and is smooth.
+%It currently fails for moderate values of d due to (I suspect) issues with machine tolerance.
+%
+%last updated 10/08/25 by Adam Petrucci
     return_data = @(start,stop) @(x) arrayfun(@(y) helper(start,stop,d,y),x);
 end
 
@@ -27,6 +33,8 @@ function return_data = helper(start,stop,d,x)
 
     n = (x>start-dd) + (x>=start+dd) + (x>stop-dd) + (x>=stop+dd);
 
+    % the cases need to be split up because some blow-up outside their
+    % intended regimes
     switch n
         case 1
             return_data = g(x-start);

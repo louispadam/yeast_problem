@@ -1,40 +1,42 @@
-function return_data = animate(x_data,parameters,fig_num,options)
-%ANIMATE Animate a collection of simulations.
+function return_data = animate(x_data,parameters,axis,options)
+%ANIMATE Animate a collection of simulations. Accepts a cell array, each
+%element of which is an 2d array of data: time x particle.
 %
-%last updated 09/24/25 by Adam Petrucci
+%last updated 10/07/25 by Adam Petrucci
 arguments (Input)
     x_data (1,:) double     % discretization of domain
-    %y_data (:,:,:) double   % results of simulation [exp_num,time,distribution]
     parameters struct       % parameters used for simulation
-    fig_num                 % figure to plot in
+    axis                    % axis to format
 end
 arguments (Input)
-    options.Names (1,:) string = []         % names of FIRST FEW curves
-    options.Colors (:,3) double = []        % colors of FIRST FEW curves
     options.Regions logical = false         % show regions?
     options.Region_labels logical = false   % add regions to legend?
-    %options.Continuous = []
-    %options.Discrete = []
-    options.Data = {}
-    options.Thickness = []
+    options.Data = {}                       % data to plot
+    options.Meta = {}                       % meta data: struct with
+                                                % name (string)
+                                                % discrete (boolean)
+                                                % color (rgb)
+                                                % thickness (double)
+    options.Title = ""                      % title of axis
+    options.Legend logical = false          % include legend?
 end
 
     %****************************
     % Collect Inputs
     %****************************
-    x = x_data;
-    %y = y_data;
-    params = parameters;
-    fn = fig_num;
 
-    names = options.Names;
-    colors = options.Colors;
+    % Required Inputs
+    x = x_data;
+    params = parameters;
+    ax = axis;
+
+    % Optional Inputs
     reg = options.Regions;
     regl = options.Region_labels;
-    %ps = options.Continuous;
-    %pp = options.Discrete;
-    pt = options.Thickness;
-    d = options.Data;
+    data = options.Data;
+    meta = options.Meta;
+    tit = options.Title;
+    leg = options.Legend;
 
     %****************************
     % Define Temporal Parameters
@@ -48,21 +50,46 @@ end
     %****************************
     % Run Animation
     %****************************
+
+    % Set up annotation for time-keeping
+    p = ax.Position;
+    a = annotation('textbox', ...
+        [p(1)+0.85*p(3),p(2)+0.9*p(4), 0.1, 0.1], ...
+        'String', sprintf('Time: %d',0), ...
+        'EdgeColor', 'none', ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle', ...
+        'FontWeight', 'bold', ...
+        'FontSize', 11);
+
     while (tt<tmax)
 
         % Check frame rate
         if (abs((fix(ptfac*tt)-ptfac*tt))/ptfac<dt)
+
+            cla(ax,'reset');
             
             % Set the array index of desired time
             ind = floor(tt/dt)+1;
 
-            ts = cellfun(@(x) x(ind,:),d,'UniformOutput',false);
+            to_send = cell([1,length(data)]);
+            for k = 1:length(data)
+                arr = data{k};
+                to_send{k} = arr(ind,:);
+            end
 
             % Display frame for given time
-            frame(x,params,fn,Names=names,Colors=colors,Index=ind, ...
-                  Regions=reg,Region_labels=regl,Time=tt, ...
-                  Data=ts,Thickness=pt);
-            pause(pr)
+            frame(x,params,ax, ...
+                  Data = to_send, ...
+                  Meta = meta, ...
+                  Title = tit, ...
+                  Legend = leg, ...
+                  Regions = reg, ...
+                  Region_labels = regl);
+
+            a.String = sprintf('Time: %.2f',tt);
+            
+            pause(pr);
 
         end
         tt=tt+dt; % Update time

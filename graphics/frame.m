@@ -1,7 +1,8 @@
 function return_data = frame(x_data,parameters,axis,options)
-%FRAME Fill an axis object to present simulation data
+%FRAME Present simulation data on a provided axis handle. Accepts a cell
+% array, each element of which is a vector of particles.
 %
-%last updated 10/6/25
+%last updated 10/07/25
 arguments (Input)
     x_data (1,:) double     % discretization of domain
     parameters struct       % parameters used for simulation
@@ -11,50 +12,54 @@ arguments (Input)
     options.Regions logical = false         % show regions?
     options.Region_labels logical = false   % add regions to legend?
     options.Data = {}                       % data to plot
-    options.Meta = {}                       % meta data:
-                                                % name
-                                                % color
-                                                % thickness
+    options.Meta = {}                       % meta data: struct with
+                                                % name (string)
+                                                % discrete (boolean)
+                                                % color (rgb)
+                                                % thickness (double)
     options.Title = ""                      % title of axis
+    options.Legend logical = false          % include legend?
 end
 
     %****************************
     % Collect Inputs
     %****************************
+
+    % Required Inputs
     x = x_data;
     params = parameters;
     ax = axis;
 
+    % Optional Inputs
     reg = options.Regions;
     regl = options.Region_labels;
-    d = options.Data;
+    data = options.Data;
     meta = options.Meta;
     tit = options.Title;
+    leg = options.Legend;
 
     % Define Spatial Parameters
-    a0 = params.s1;
-    a1 = params.s2;
-    b0 = params.r1;
-    b1 = params.r2;
-    del = params.del;
+    s1 = params.s1;
+    s2 = params.s2;
+    r1 = params.r1;
+    r2 = params.r2;
+    ct = params.ct;
 
     %****************************
     % Compile Data
     %****************************
-    
-    d_s = length(d);
-    y = zeros([d_s,length(x)]);
+    data_l = length(data);
+    to_plot = zeros([data_l,length(x)]);
 
-    for k = 1:d_s
+    for k = 1:data_l
+        arr = data{k};
 
-        arr = d{k};
-
-        if length(arr) ~= length(x)
+        % if discrete data, thicken
+        if meta{k}.discrete
             arr = fatten_points_polynomial(x,arr,meta{k}.thickness);
         end
 
-        y(k,:) = arr;
-
+        to_plot(k,:) = arr;
     end
 
     %****************************
@@ -62,17 +67,18 @@ end
     %****************************
 
     hold(ax,"on");
-
-    si = size(y);
+    si = size(to_plot);
 
     for k = 1:si(1)
-        u = y(k,:);
+        u = to_plot(k,:);
 
+        % Set name
         name = meta{k}.name;
         if name == ""
             name = sprintf('data %d',k);
         end
 
+        % Set Color; default is gradient of greys
         color = meta{k}.color;
         if color == [-1,-1,-1]
             color = ([220,220,220] + ([105,105,105]-[220,220,220])*k/si(1))/255;
@@ -83,26 +89,38 @@ end
     end
     
     % Determine upper bound of figure
-    m = max(y,[],"all");
+    m = max(to_plot,[],"all");
 
-    %ChiR = 1.1*m*0.25*(tanh(4*pi*(x-b0)/del)+1).*(tanh(4*pi*(b1-x)/del)+1);
-    %ChiS = 1.1*m*0.25*(tanh(4*pi*(x-a0)/del)+1).*(tanh(4*pi*(a1-x)/del)+1);
+    % If desired, show cutoff regions
+    if reg
 
-    %if reg
-    %    temp1 = plot(ax,x,ChiR,'-','Color',[192,192,192]/255,'linewidth',2,'DisplayName','responsive');
-    %    temp2 = plot(ax,x,ChiS,'-','Color',[128,128,128]/255,'linewidth',2,'DisplayName','signaling');
-    %    if ~regl
-    %        set(get(get(temp1, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
-    %        set(get(get(temp2, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
-    %    end
-    %end
+        class(ct)
 
+        ChiR = ct(r1,r2);
+        ChiS = ct(s1,s2);
+
+        ChiR = 1.1*m*ChiR(x);
+        ChiS = 1.1*m*ChiS(x);
+
+        temp1 = plot(ax,x,ChiR,'-','Color',[0,0,0]/255,'linewidth',1,'DisplayName','R');
+        temp2 = plot(ax,x,ChiS,'-','Color',[0,0,0]/255,'linewidth',1,'DisplayName','S');
+
+        % If not desired, remove cutoff labels from legend
+        if ~regl
+            set(get(get(temp1, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
+            set(get(get(temp2, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
+        end
+    end
+
+    % Parameters for plot
     ax.XLim = [0 1];
     ax.YLim = [0 m*1.1];
     ylabel(ax,'Density');
     xlabel(ax,'Position');
     title(ax,tit,'Fontsize',18,'FontWeight', 'bold')
-    %legend show
+    if leg
+        legend show
+    end
 
     return_data = ax;
 

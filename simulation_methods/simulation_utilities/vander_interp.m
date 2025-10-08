@@ -1,10 +1,23 @@
 function return_data = vander_interp(x,b)
-% I should try to figure out the 3-tensor formalism for this, it would
-% streamline the code
+%VANDER_INTERP constructs a interpolative polynomial given the desired
+%derivatives at a collection of polynomials. Check 'Confluent Vandermonde
+%Matrices' on Wikipedia for more information.
+%
+%last updated 10/08/25 by Adam Petrucci
+arguments (Input)
+    x       % Collection of points to match
+    b       % Desired values of functions and derivatives, in form
+            % [function value at x1, derivative value at x1, ...
+            %  function value at xn, derivative value at xn].'
+end
 
+    % number of points to match
     n = length(x);
+
+    % number of derivatives at each point
     m = length(b)/n;
 
+    % Construct Vandermonde matrix, with correction for x=0
     XP = zeros(n*m);
     P = (1:n*m)-1;
     for k = 1:n
@@ -22,14 +35,7 @@ function return_data = vander_interp(x,b)
     end
     XP = fliplr(XP);
 
-    %for k = 1:n
-    %    x_(m*(k-1)+1:m*k) = ones([1,m])*x(k);
-    %end
-    %x = x_;
-
-    %P = (1:n*m)-1;
-    %XP = fliplr(x.^P);
-
+    % Construct Taylor matrix
     V = zeros(n*m);
     V_ = zeros([m,n*m]);
     for i = 0:m-1
@@ -41,6 +47,7 @@ function return_data = vander_interp(x,b)
         V((1:m)+(k-1)*m,1:n*m) = V_;
     end
 
+    % Solve linear system for polynomial coefficients
     A = V.*XP;
     coeffs = A\b.';
 

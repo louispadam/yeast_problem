@@ -138,6 +138,7 @@ for np = 1:grain
         meta_d = cell(1,1+grain);
 
         meta_d{1} = struct('name',"Continuous", ...
+            'type',0, ...
             'color',[0,0,255]/255, ...
             'thickness',0);
 
@@ -149,6 +150,7 @@ for np = 1:grain
             ar = data_p{np,i};
             to_send{1+i} = ar(grab_from,:);
             meta_d{1+i} = struct('name',sprintf('Trial %d',1+i), ...
+                'type',1, ...
                 'color',[-1,-1,-1], ...
                 'thickness',parameters.eps);
         end
@@ -225,30 +227,3 @@ annotation('textbox', ...
     'FontSize', 11);
 
 disp('Graphed Initial Conditions')
-
-%%
-
-meta_d = cell(1,2);
-
-meta_d{1} = struct('name',"Continuous", ...
-    'color',[0,0,255]/255, ...
-    'thickness',0);
-
-to_send = cell(1,2);
-ar = data_s{1};
-to_send{1} = ar(1,:);
-
-ar = data_p{np,1};
-to_send{2} = ar(grab_from,:);
-meta_d{2} = struct('name',sprintf('Trial %d',2), ...
-    'color',[-1,-1,-1], ...
-    'thickness',parameters.eps);
-
-figure(3)
-clf
-
-aa = gca;
-
-frame(x,parameters,aa, ...
-    Data = to_send, ...
-    Meta = meta_d);

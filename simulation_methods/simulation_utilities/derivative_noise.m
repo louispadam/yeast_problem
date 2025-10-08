@@ -2,7 +2,7 @@ function return_data = derivative_noise(parameters,curr_state)
 %DERIVATIVE_NOISE calculates the derivative of a particle assuming linear
 %interaction and noise.
 %
-%last updated 08/30/25 by Adam Petrucci
+%last updated 10/07/25 by Adam Petrucci
 arguments (Input)
     parameters struct   % parameters for simulation
     curr_state (1,:)    % current state of the system
@@ -22,14 +22,14 @@ end
     alph = params.alph;
     ct = params.ct;
 
+    % Construct Cutoffs
     ChiR = ct(r1,r2);
     ChiS = ct(s1,s2);
 
     % Calculate Derivative
     mass_active = sum(ChiS(state))/length(state);
-    %mass_active = sum((s1<state).*(state<s2))/length(state);
     noise = sqrt(2*dt)*eps*rand([1,length(state)]);
+
     return_data = 1+influence(mass_active,alph).*ChiR(state)+noise;
-    %return_data = 1+influence(mass_active,alph).*(r1<state).*(state<r2)+noise;
 
 end

@@ -1,9 +1,13 @@
 function return_data = ct_poly(d,options)
+%CT_POLY sets the framework for defining a bump function
+%It is polynomial, has bounded support, and is N-times continuously differentiable.
+%
+%last updated 10/08/25 by Adam Petrucci
 arguments (Input)
-    d
+    d               % length on which to 'bump'
 end
 arguments (Input)
-    options.N = 1
+    options.N = 1   % differentiability
 end
 
     n = options.N;
