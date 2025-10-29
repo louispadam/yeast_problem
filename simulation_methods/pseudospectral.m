@@ -26,6 +26,7 @@ end
     eps=params.eps;     % diffusion coefficient
     alpha=params.alph;  % term in linear influence
     ct=params.ct;
+    msz=params.m_sz;
 
     %******************************
     % Set up Fourier Transform
@@ -70,10 +71,18 @@ end
     tt=0;
 
     steps = round(t_final/h + 1);
-    time = zeros([1,steps]);
-    data = zeros([steps,length(ic)]);
+    sz = steps;
+    keep = 1;
+    if sz > msz
+        sz = msz;
+        keep = steps/msz;
+    end
+    time = zeros([1,sz]);
+    data = zeros([sz,length(ic)]);
     data(1,:) = ic;
-
+    
+    k = 1;
+    here = round(keep*k);
     for step = 2:steps
         Uh=fft(U);
         URh=fft(U.*ChiR);
@@ -85,8 +94,15 @@ end
 
         tt=tt+h;
 
-        time(step) = tt;
-        data(step,:) = U;
+        if step == here
+            time(k) = tt;
+            data(k,:) = U;
+            k = k+1;
+            here = round(keep*k);
+        end
+
+        %time(step) = tt;
+        %data(step,:) = U;
 
     end
 

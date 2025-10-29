@@ -17,6 +17,7 @@ arguments (Input)
                                                 % discrete (boolean)
                                                 % color (rgb)
                                                 % thickness (double)
+    options.Time = []
     options.Title = ""                      % title of axis
     options.Legend logical = false          % include legend?
 end
@@ -37,6 +38,7 @@ end
     meta = options.Meta;
     tit = options.Title;
     leg = options.Legend;
+    time = options.Time;
 
     %****************************
     % Define Temporal Parameters
@@ -55,22 +57,25 @@ end
     p = ax.Position;
     a = annotation('textbox', ...
         [p(1)+0.85*p(3),p(2)+0.9*p(4), 0.1, 0.1], ...
-        'String', sprintf('Time: %d',0), ...
+        'String', sprintf('Time: %d',time(1)), ...
         'EdgeColor', 'none', ...
         'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'middle', ...
         'FontWeight', 'bold', ...
         'FontSize', 11);
 
-    while (tt<tmax)
+    %while (tt<tmax)
+    for ind = 1:length(time)
 
         % Check frame rate
-        if (abs((fix(ptfac*tt)-ptfac*tt))/ptfac<dt)
+        %if (abs((fix(ptfac*tt)-ptfac*tt))/ptfac<dt)
+        if mod(ind, ptfac) == 0 % I should be able to speed this up by
+                                % putting it in the for loop
 
             cla(ax,'reset');
             
             % Set the array index of desired time
-            ind = floor(tt/dt)+1;
+            %ind = floor(tt/dt)+1
 
             to_send = cell([1,length(data)]);
             for k = 1:length(data)
@@ -87,7 +92,7 @@ end
                   Regions = reg, ...
                   Region_labels = regl);
 
-            a.String = sprintf('Time: %.2f',tt);
+            a.String = sprintf('Time: %.2f',time(ind));
             
             pause(pr);
 
