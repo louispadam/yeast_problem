@@ -94,8 +94,6 @@ end
     % If desired, show cutoff regions
     if reg
 
-        class(ct)
-
         ChiR = ct(r1,r2);
         ChiS = ct(s1,s2);
 
@@ -103,7 +101,7 @@ end
         ChiS = 1.1*m*ChiS(x);
 
         temp1 = plot(ax,x,ChiR,'-','Color',[0,0,0]/255,'linewidth',1,'DisplayName','R');
-        temp2 = plot(ax,x,ChiS,'-','Color',[0,0,0]/255,'linewidth',1,'DisplayName','S');
+        temp2 = plot(ax,x,ChiS,'-','Color',[150,150,150]/255,'linewidth',1,'DisplayName','S');
 
         % If not desired, remove cutoff labels from legend
         if ~regl

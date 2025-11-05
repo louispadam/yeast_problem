@@ -28,6 +28,8 @@ end
     ct=params.ct;
     msz=params.m_sz;
 
+    fprintf("epsilon is %d\n",parameters.eps);
+
     %******************************
     % Set up Fourier Transform
     %******************************
@@ -81,7 +83,7 @@ end
     data = zeros([sz,length(ic)]);
     data(1,:) = ic;
     
-    k = 1;
+    k = 2;
     here = round(keep*k);
     for step = 2:steps
         Uh=fft(U);
@@ -99,6 +101,7 @@ end
             data(k,:) = U;
             k = k+1;
             here = round(keep*k);
+            fprintf('Done step %d of %d.\n',step,steps)
         end
 
         %time(step) = tt;
