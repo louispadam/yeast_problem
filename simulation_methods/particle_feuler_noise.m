@@ -1,7 +1,8 @@
-function [return_time, return_data] = forward_euler(initial,parameters)
-%FORWARD_EULER simulates the yeast NODE using a forward-euler algorithm.
+function [return_time, return_data] = particle_feuler_noise(initial,parameters)
+%FORWARD_EULER_NOISE simulates the yeast NODE with diffusion using a
+%forward-euler algorithm. I believe this is known as Euler-Maruyama
 %
-%last updated 08/30/25 by Adam Petrucci
+%last updated 10/06/25 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
@@ -11,11 +12,11 @@ arguments (Output)
     return_data (:,:)   % simulation results: [time,data]
 end
     
-    % Collect Inputs
+    % Collection inputs
     ic = initial;
     params = parameters;
 
-    % Define Temporal parameters
+    % Define temporal parameters
     dt = params.dt;
     t_final = params.tfin;
 
@@ -28,7 +29,7 @@ end
     % Iterate!
     for step = 2:steps
         time(step) = time(step-1) + dt;
-        data(step,:) = mod(data(step-1,:) + dt*derivative(params,data(step-1,:)),1);
+        data(step,:) = mod(data(step-1,:) + dt*derivative_noise(params,data(step-1,:)),1);
     end
 
     return_time = time;

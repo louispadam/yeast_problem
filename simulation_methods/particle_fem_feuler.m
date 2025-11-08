@@ -1,4 +1,6 @@
-function [return_time return_data] = fem_euler(x,initial,parameters)
+function [return_time return_data] = particle_fem_feuler(x,initial,parameters)
+%
+%last updated 11/07/25 by Adam Petrucci
 
     tic;
 

@@ -1,8 +1,6 @@
-function [return_time, return_data]=pseudospectral(initial,parameters)
-%PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
-%techniques
+function [return_time, return_data]=cont_sudospec_etd_feuler(initial,parameters)
 %
-%last updated 10/06/25 by Adam Petrucci
+%last updated 11/07/25 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
@@ -28,8 +26,6 @@ end
     ct=params.ct;
     msz=params.m_sz;
 
-    fprintf("epsilon is %d\n",parameters.eps);
-
     %******************************
     % Set up Fourier Transform
     %******************************
@@ -49,27 +45,26 @@ end
     c_ChiR = ct(b0,b1);
     ChiR = c_ChiR(X);
     ChiR = ChiR.';
+    ChiRf = fft(ChiR);
+    ChiRf = ChiRf(1,1:length(dx));
 
     c_ChiS = ct(a0,a1);
     ChiS = c_ChiS(X);
     ChiS = ChiS.';
 
-    c_ChiP = ct(c0,c1);
-    ChiP = c_ChiP(X);
-    ChiP = ChiP.';
-
-    %ChiR = 0.25*(tanh((X-b0)/dd2)+1).*(tanh((b1-X)/dd2)+1);
-    %ChiS = 0.25*(tanh((X-a0)/dd2)+1).*(tanh((a1-X)/dd2)+1);
-    %ChiP = 0.25*(tanh((X-c0)/dd2)+1).*(tanh((c1-X)/dd2)+1); % region where we restore positivity
+    %c_ChiP = ct(c0,c1);
+    %ChiP = c_ChiP(X);
+    %ChiP = ChiP.';
 
     %***************************************************
     % Start Iterations
     %**************************************************
     h=params.dt;
     t_final = params.tfin;
-    Symb=1+h*(eps^2*kx.^2*8*pi^2+1i*kx*4*pi);
-    squash=kx.^2<(max(kx.^2)/4);
+    %Symb=1+h*(eps^2*kx.^2*8*pi^2+1i*kx*4*pi);
+    %squash=kx.^2<(max(kx.^2)/4);
     U=ic;
+    Uf = fft(U);
     tt=0;
 
     steps = round(t_final/h + 1);
@@ -86,19 +81,23 @@ end
     k = 2;
     here = round(keep*k);
     for step = 2:steps
-        Uh=fft(U);
-        URh=fft(U.*ChiR);
-        PS=trapz(X,ChiS.*U)/2/L;   % interaction term (but normalized???)
-        Uh=(Uh+4*pi*h*1i*alpha*kx.*(URh*PS))./Symb;
-        Uh=Uh.*squash;    % ???
-        U=real(ifft(Uh));
-        U=U-(U<0).*(ChiP.*U); % restore U to positive in this region
+        %Uh=fft(U);
+        %URh=fft(U.*ChiR);
+        %PS=trapz(X,ChiS.*U)/2/L;   % interaction term (but normalized???)
+        %Uh=(Uh+4*pi*h*1i*alpha*kx.*(URh*PS))./Symb;
+        %Uh=Uh.*squash;    % ???
+        %U=real(ifft(Uh));
+        %U=U-(U<0).*(ChiP.*U); % restore U to positive in this region
+
+        l_tm = exp(-2*L*1i*kx*h).*Uf;
+        nl_tm = alpha*trapz(ChiS,real(ifft(Uf)))*conv(ChiRf,Uf).*(1-exp(-2*L*1i*kx*h))/(2*L);
+        Uf = l_tm + nl_tm;
 
         tt=tt+h;
 
         if step == here
             time(k) = tt;
-            data(k,:) = U;
+            data(k,:) = real(ifft(Uf));
             k = k+1;
             here = round(keep*k);
             fprintf('Done step %d of %d.\n',step,steps)
