@@ -1,4 +1,4 @@
-function return_data = stationary_soln(x,params)
+function return_data = stationary_soln_vm(x,params)
 
     r1 = params.r1;
     r2 = params.r2;

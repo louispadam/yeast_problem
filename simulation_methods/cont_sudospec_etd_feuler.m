@@ -25,6 +25,7 @@ end
     alpha=params.alph;  % term in linear influence
     ct=params.ct;
     msz=params.m_sz;
+    ud=params.update;
 
     %******************************
     % Set up Fourier Transform
@@ -46,7 +47,7 @@ end
     ChiR = c_ChiR(X);
     ChiR = ChiR.';
     ChiRf = fft(ChiR);
-    ChiRf = ChiRf(1,1:length(dx));
+    %ChiRf = ChiRf(1,1:length(dx));
 
     c_ChiS = ct(a0,a1);
     ChiS = c_ChiS(X);
@@ -61,8 +62,6 @@ end
     %**************************************************
     h=params.dt;
     t_final = params.tfin;
-    %Symb=1+h*(eps^2*kx.^2*8*pi^2+1i*kx*4*pi);
-    %squash=kx.^2<(max(kx.^2)/4);
     U=ic;
     Uf = fft(U);
     tt=0;
@@ -80,17 +79,31 @@ end
     
     k = 2;
     here = round(keep*k);
+    
+    pb = round(linspace(2,steps,20));
+    n_pb = 1;
+
+    if ud
+        fprintf("Began Simulation\n");
+    end
+
     for step = 2:steps
-        %Uh=fft(U);
-        %URh=fft(U.*ChiR);
-        %PS=trapz(X,ChiS.*U)/2/L;   % interaction term (but normalized???)
-        %Uh=(Uh+4*pi*h*1i*alpha*kx.*(URh*PS))./Symb;
-        %Uh=Uh.*squash;    % ???
-        %U=real(ifft(Uh));
-        %U=U-(U<0).*(ChiP.*U); % restore U to positive in this region
 
         l_tm = exp(-2*L*1i*kx*h).*Uf;
-        nl_tm = alpha*trapz(ChiS,real(ifft(Uf)))*conv(ChiRf,Uf).*(1-exp(-2*L*1i*kx*h))/(2*L);
+        if step == 3
+            figure(6)
+            clf
+            hold on
+            plot(ChiRf)
+            plot(Uf)
+            plot(conv(ChiRf,Uf,'same'))
+            trapz(linspace(0,1,N),ChiS.*real(ifft(Uf)))
+
+        end
+        %nl_tm = alpha*trapz(linspace(0,1,N),ChiS.*real(ifft(Uf)))*...
+        %        conv(ChiRf,Uf,'same').*(1-exp(-2*L*1i*kx*h))/(N*2*L);
+        nl_tm = alpha*trapz(linspace(0,1,N),ChiS.*real(ifft(Uf)))*...
+                fft(ChiR.*real(ifft(Uf))).*(1-exp(-2*L*1i*kx*h))/(N*2*L);
         Uf = l_tm + nl_tm;
 
         tt=tt+h;
@@ -100,14 +113,21 @@ end
             data(k,:) = real(ifft(Uf));
             k = k+1;
             here = round(keep*k);
-            fprintf('Done step %d of %d.\n',step,steps)
+            
         end
 
-        %time(step) = tt;
-        %data(step,:) = U;
+        if ud && step == pb(n_pb)
+            fprintf('Simulation Progress: %3.0f%%\n',100*step/steps)
+            n_pb = n_pb + 1;
+        end
 
     end
 
     return_time = time;
     return_data = data;
+
+    if ud
+        fprintf('Completed Simulation\n')
+    end
+
 end
