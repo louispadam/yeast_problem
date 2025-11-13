@@ -18,10 +18,7 @@ end
     a1=params.s2*2*L-L;
     b0=params.r1*2*L-L;
     b1=params.r2*2*L-L;
-    c0=(params.r2+0.2*(1-params.r2))*2*L-L;
-    c1=(params.r2+0.8*(1-params.r2))*2*L-L;
     del=params.del;     % for defining characteristic function via tanh
-    eps=params.eps;     % diffusion coefficient
     alpha=params.alph;  % term in linear influence
     ct=params.ct;
     msz=params.m_sz;
@@ -46,16 +43,11 @@ end
     c_ChiR = ct(b0,b1);
     ChiR = c_ChiR(X);
     ChiR = ChiR.';
-    ChiRf = fft(ChiR);
-    %ChiRf = ChiRf(1,1:length(dx));
+    %ChiRf = fft(ChiR);
 
     c_ChiS = ct(a0,a1);
     ChiS = c_ChiS(X);
     ChiS = ChiS.';
-
-    %c_ChiP = ct(c0,c1);
-    %ChiP = c_ChiP(X);
-    %ChiP = ChiP.';
 
     %***************************************************
     % Start Iterations
@@ -90,20 +82,10 @@ end
     for step = 2:steps
 
         l_tm = exp(-2*L*1i*kx*h).*Uf;
-        if step == 3
-            figure(6)
-            clf
-            hold on
-            plot(ChiRf)
-            plot(Uf)
-            plot(conv(ChiRf,Uf,'same'))
-            trapz(linspace(0,1,N),ChiS.*real(ifft(Uf)))
-
-        end
         %nl_tm = alpha*trapz(linspace(0,1,N),ChiS.*real(ifft(Uf)))*...
         %        conv(ChiRf,Uf,'same').*(1-exp(-2*L*1i*kx*h))/(N*2*L);
-        nl_tm = alpha*trapz(linspace(0,1,N),ChiS.*real(ifft(Uf)))*...
-                fft(ChiR.*real(ifft(Uf))).*(1-exp(-2*L*1i*kx*h))/(N*2*L);
+        nl_tm = alpha*trapz(linspace(-L,L,N),ChiS.*real(ifft(Uf)))*...
+                fft(ChiR.*real(ifft(Uf))).*(1-exp(-2*L*1i*kx*h))/(2*L);
         Uf = l_tm + nl_tm;
 
         tt=tt+h;

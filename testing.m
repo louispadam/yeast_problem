@@ -1,148 +1,132 @@
-%% Boilerplate
+%% testing.m
+%
+% This file includes a collection of tests for numerical methods. One
+% should be able to roughly evaluate the qualitative accuracy of a
+% numerical simulation of the yeast problem using these tests.
+%
+% last updated 11/13/25 by Adam Petrucci
 
-% Instantiate Parameter Structure
-parameters = struct('s1',0, ...     % beginning of signalling region
-                    's2',0.3, ...   % end of signalling region
-                    'r1',0.4, ...   % beginning of responsive region
-                    'r2',0.5, ...   % end of responsive region
-                    'dt',0.001, ... % simulation time step
-                    'tfin',100, ... % ending time
-                    'del',0.1, ...  % sharpness of hyperbolic cutoffs
-                    'eps',0.025, ...% diffusive coefficient
-                    'alph',0.9, ... % linear inhibition term
-                    'fr',2, ...     % frame rate
-                    'pr',1);        % pause rate
+% Generate parameter structure
+parameters = boiler_plate();
 
-% Add subdirectories to path
-addpath(genpath(pwd));
+% Set parameters
+parameters.s1     = 0.1;
+parameters.s2     = 0.4;
+parameters.r1     = 0.6;
+parameters.r2     = 0.7;
+parameters.dt     = 0.001;
+parameters.tfin   = 10;
+parameters.del    = 0.05;
+parameters.eps    = 0.05;
+parameters.alph   = 0.9;
+parameters.fr     = 50; 
+parameters.pr     = 0.002;
+parameters.ct     = ct_sharp(parameters.del);
+parameters.m_sz   = 2^15;
+parameters.update = true;
 
-%%
+to_test = @(x,y) cont_sudospec_beuler(x,y);
 
-parameters.s1    = 0.1;
-parameters.s2    = 0.3;
-parameters.r1    = 0.4;
-parameters.r2    = 0.5;
-parameters.dt    = 0.001;
-parameters.tfin  = 0.5;
-parameters.del   = 0.1;
-parameters.eps   = 0.025;
-parameters.alph  = 0.9;
-parameters.fr    = 100; 
-parameters.pr    = 0.01;
+% Test a narrow Gaussian
+test_gaussian(to_test, parameters);
 
-disp('start')
+% Test the stationary solution
+%test_stationary(to_test, parameters);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Test 1
+% Test smoothed-out stationary solution
+%test_stationary_smooth(to_test, parameters);
 
-n = 10;
-x = linspace(0,1,2^n);
+%-HELPER-FUNCTIONS-----------------------------------------------------
 
-% test fatten_points_polynomial
-d_0 = fatten_points_polynomial(x,0.5,0.3);
-d_0 = d_0.';
+function test_gaussian(to_test, parameters)
 
-% test pseudospectral
-[ps_t, ps_d] = pseudospectral(d_0,parameters);
+    % Setup domain
+    n = 11;
+    x = linspace(0,1,2^n);
 
-% test process_pseudospectral
-ps_f = process_pseudospectral(x,ps_t,ps_d);
+    % Generate initial conditions
+    ex = @(z) exp(-(z-0.5).^2/0.0001);
+    ic = ex(x)/lp_integrate(x,ex(x),1);
 
-runs = 2;
-pts = 200;
-
-rr = zeros([2*runs,pts]);
-
-e_0 = zeros([2*runs,pts]);
-
-for k = 1:runs
-
-    % test construct_em
-    p = construct_em(x,d_0,pts);
-    % test forward_euler_noise
-    [en_t, en_d] = forward_euler_noise(p,parameters);
-    % test forward_euler
-    [e_t, e_d] = forward_euler(p,parameters);
-
-    e_0(k,:) = en_d(1,:);
-    e_0(2+k,:) = e_d(1,:);
-    rr(k,:) = en_d(1,end,:);
+    run_test(x,ic,to_test,parameters);
 
 end
 
-mms = zeros([runs,3]);
-mms_0 = zeros([runs,3]);
-ff_d = zeros([runs,1,length(x)]);
-ic_f = zeros([1+runs,1,length(x)]);
-ic_f(1,1,:) = d_0;
-for k = 1:runs
+function test_stationary(to_test, parameters)
 
-    % test metric_lp_1
-    mms(k,:) = metric_lp_1(rr(k,:),x,ps_d(end,:),1);
-    ho = fatten_points_polynomial(x,rr(k,:),mms(k,2));
-    ff_d(k,1,:) = ho;
-    
-    mms_0(k,:) = metric_lp_1(e_0(k,:),x,d_0.',1);
-    ho = fatten_points_polynomial(x,e_0(k,:),mms_0(k,2));
-    ic_f(k+1,1,:) = ho;
+    % Setup domain
+    n = 11;
+    x = linspace(0,1,2^n);
+
+    % Generate initial conditions
+    ic = stationary_soln_v(x,parameters);
+
+    run_test(x,ic,to_test,parameters);
 
 end
 
-al_f = cat(1,ps_f(:,end,:),ff_d);
-names = ["ps","en1","en2","e3","e4"];
-colors = [linspace(0,1,runs);zeros([1,runs]);linspace(1,0,runs)].';
-frame(x,al_f,parameters,2,'Names',names,'Colors',colors,'Time',parameters.tfin);
-frame(x,ic_f,parameters,3,'Names',names,'Colors',colors,'Time',0);
+function test_stationary_smooth(to_test,parameters)
 
-disp('Done Test 1')
+    % Setup domain
+    n = 11;
+    x = linspace(0,1,2^n);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Test 2
+    % Generate initial conditions
+    ic = stationary_soln_v(x,parameters);
+    ex = @(z) exp(-(z-0.5).^2/0.0001);
+    e = ex(x)/lp_integrate(x,ex(x),1);
+    tempe = conv(ic,e,'same')/length(x);
+    ic(100:end-100) = tempe(100:end-100);
 
-particles = rand([1, 100]);
-n = 10;
-x = linspace(0,1,2^n);
+    run_test(x,ic,to_test,parameters);
 
-particles_fat = fatten_points_polynomial(x,particles,0.1);
+end
 
-[ps_t, ps_d] = pseudospectral(particles_fat.',parameters);
-ps_f = process_pseudospectral(x,ps_t,ps_d);
+function run_test(x,ic,to_test,parameters)
 
-[en_t, en_d] = forward_euler_noise(particles,parameters);
-en_f = process_euler(x,en_t,en_d,0.1);
+    % Visualize Initial Conditions
 
-[fe_t, fe_d] = forward_euler(particles,parameters);
-fe_f = process_euler(x,fe_t,fe_d,0.1);
+    figure(1)
+    clf
+    ax = gca;
+    frame(x,parameters,ax,...
+        "Data",{ic},...
+        "Meta",{struct('name',"Initial Distribution", ...
+                       'discrete',false, ...
+                       'color',[0,0,255]/255, ...
+                       'thickness',0.01)}, ...
+        "Legend",true,...
+        "Regions",true,...
+        "Region_labels",true,...
+        "Title",["Time: " 0]);
 
-al_f = cat(1,fe_f,ps_f);
-al_f = cat(1,al_f,en_f);
-names = ["forward euler","pseudospectral","noisy euler"];
-animate(x,al_f,parameters,4,'Names',names);
+    disp('Visualized IC')
 
-disp('Done Test 2')
+    %---------------------------------------------------------------
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Test 3
+    % Simulate Continuous System (MVP)
 
-n = 10;
-x = linspace(0,1,2^n);
+    [ps_t, ps_d] = to_test(ic,parameters);
 
-d_0 = fatten_points_polynomial(x,0.5,0.3)+ 0.2;
-d_0 = d_0/lp_integrate(x,d_0,1);
-d_0 = d_0.';
+    disp('Simulated MVP')
 
-e_0 = construct_em(x,d_0,1000);
-e_0_t = fatten_points_polynomial(x,e_0,0.001)/10;
-e_t = fatten_points_polynomial(x,e_0,0.1);
+    %---------------------------------------------------------------
 
-figure(5)
-clf
-hold on
+    % Visualize Ending Distribution
 
-plot(x,d_0);
-plot(x,e_0_t)
-plot(x,e_t)
+    figure(2)
+    clf
+    ax = gca;
+    frame(x,parameters,ax,...
+        "Data",{ps_d(end,:)},...
+        "Meta",{struct('name',"Ending Distribution", ...
+                       'discrete',false, ...
+                       'color',[0,0,255]/255, ...
+                       'thickness',0)}, ...
+        "Legend",true,...
+        "Regions",true,...
+        "Title",["Time: " parameters.tfin]);
 
-disp('Done Test 3')
+    disp("Visualized Final Distribution")
 
-disp('end')
+end

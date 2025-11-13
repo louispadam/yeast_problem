@@ -1,3 +1,11 @@
+%% 11/04/2025
+%
+% This script is for a research meeting with Keith Promislow. It is
+% intended to explore the apparent diffusion in our numerical simulation of
+% the continuous model
+%
+% last updated 11/13/25 by Adam Petrucci
+
 %% Boilerplate
 
 % Instantiate Parameter Structure

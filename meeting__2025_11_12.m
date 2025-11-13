@@ -1,3 +1,11 @@
+%% 11/12/2025
+%
+% This script is for a research meeting with Keith Promislow. It is
+% intended to show that last week's diffusion problem has been resolved,
+% but something is wrong with the interaction term.
+%
+% last updated 11/13/25 by Adam Petrucci
+
 %% Boilerplate
 
 % Instantiate Parameter Structure
