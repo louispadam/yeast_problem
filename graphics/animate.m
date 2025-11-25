@@ -64,6 +64,10 @@ end
         'FontWeight', 'bold', ...
         'FontSize', 11);
 
+    ssss = data{1};
+    ssss(1,:)
+    ssss(7001,:)
+
     %while (tt<tmax)
     for ind = 1:length(time)
 

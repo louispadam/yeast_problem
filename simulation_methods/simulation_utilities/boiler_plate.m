@@ -1,9 +1,5 @@
 function return_data = boiler_plate()
 
-    % Add project to path
-    addpath(genpath(pwd));
-    disp(['Added to path: ' pwd])
-
     % Generate parameter structure
     parameters = struct(...
         's1',0, ...        % beginning of signalling region

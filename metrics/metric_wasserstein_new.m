@@ -39,7 +39,7 @@ end
     Lp = 10;        % I think this has to be calculated
     L = max(Lp,Lm);
 
-    epsi = 1e-15;   % error tolerance
+    epsi = 1e-6;   % error tolerance
 
     tm = -1;        % lower theta bound
     tp =  1;        % upper theta bound
@@ -48,10 +48,10 @@ end
     pasfini = 1;   % boolean for while loop
 
     % checking helper functions work
-    test = 0;
+    test = 1;
     if test
-        Ctest1 = C(0  ,X,Y,CX,CY,n0,n1,lambda);
-        Ctest2 = C(0.2,X,Y,CX,CY,n0,n1,lambda);
+        Ctest1 = C(0,X,Y,CX,CY,n0,n1,lambda)
+        Ctest2 = C(0.3,X,Y,CX,CY,n0,n1,lambda)
         s = rand();
         tau	= 1e-4;
         [Dd,Dd]	= dC(s,X,Y,CX,CY,n0,n1,lambda);
@@ -65,7 +65,7 @@ end
 
     % if desired, display update
     if update
-        fprintf(2,'iteration 0 | tm = %f | tp = %f | tc = %f | cout = %f\n',...
+        fprintf('iteration 0 | tm = %f | tp = %f | tc = %f | cout = %f\n',...
                 tm,tp,tc,C(tc,X,Y,CX,CY,n0,n1,lambda));
     end
 
@@ -93,8 +93,10 @@ end
             Ctm	= C(tm,X,Y,CX,CY,n0,n1,lambda);
 
             % if not already within tolerance, recalculate theta
-            if abs(dCptm-dCmtp)>epsi % I changed 0.001 to epsi
-                tc = (Ctp-Ctm + dCptm*tm - dCmtp*tp)/(dCptm-dCmtp);
+            if abs(dCptm-dCmtp)>0.001
+                % Something's not working here, it recalculates very large
+                % numbers. Maybe there's a scaling issue
+                %tc = (Ctp-Ctm + dCptm*tm - dCmtp*tp)/(dCptm-dCmtp);
             end
 
             pasfini = 0;    % end loop
@@ -120,7 +122,7 @@ end
 
         % if desired, display update
         if update
-            fprintf(2,'iteration %i | tm = %f | tp = %f | tc = %f | dCp = %f | dCm =%f | cout = %f\n', ...
+            fprintf('iteration %i | tm = %f | tp = %f | tc = %f | dCp = %f | dCm =%f | cout = %f\n', ...
                     iter,tm,tp,tc,dCp,dCm,C(tc,X,Y,CX,CY,n0,n1,lambda))
         end
         
@@ -128,20 +130,28 @@ end
         %cout=C(tc,X,Y,CX,CY,n0,n1,lambda)
         %tc
 
+        return_data = C(tc,X,Y,CX,CY,n0,n1,lambda);
+
     end
 end
 
 
 function valC = C(t,X,Y,CX,CY,n0,n1,lambda)
-% Calculate left and right derivatives of cost function
+% Calculate cost
 
+    % I don't understand what floot(t) does here
     Ip = CY-(t-floor(t))>=0;
     In = CY-(t-floor(t))< 0;
 
     valF0 = ones(n0+n1,n0)*diag(CX);
+
+    % here is the translation
     valF1t = ones(n0+n1,n1)*diag([CY(Ip)-(t-floor(t)),CY(In)-(t-floor(t))+1]);
+
+    % here's the sorting
     vsort = [0,sort([valF0(1,:),valF1t(1,:)])];
 
+    % again reordering
     Yt = [ Y(Ip)+floor(t) ,  Y(In)+1+floor(t) ];
     Yt = [ Yt, Yt(1)+1];
 
@@ -156,13 +166,15 @@ function valC = C(t,X,Y,CX,CY,n0,n1,lambda)
     % I don't know what these were for
     %size(xk);
     %size(yk);
+
+    cout(xk,yk,lambda);
     
-    valC = [vsort(2:n0+n1+1)-vsort(1:n0+n1)]*cout(xk,yk,lambda);
+    valC = (vsort(2:n0+n1+1)-vsort(1:n0+n1))*cout(xk,yk,lambda);
     
 end
 
 function [valdcp,valdcm] = dC(t,X,Y,CX,CY,n0,n1,lambda)
-% Calculate cost
+% Calculate left and right derivatives of cost function
 
     Ip = CY-(t-floor(t))>=0;
     In = CY-(t-floor(t))< 0;

@@ -59,6 +59,10 @@ end
             arr = fatten_points_polynomial(x,arr,meta{k}.thickness);
         end
 
+        figure(k)
+        clf
+        plot(x,arr)
+
         to_plot(k,:) = arr;
     end
 
