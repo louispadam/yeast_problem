@@ -44,7 +44,6 @@ end
     % Define Temporal Parameters
     %****************************
     dt=params.dt;       % simulation time step
-    tmax = params.tfin; % ending time
     tt=0;               % current time
     ptfac=params.fr;    % frame rate
     pr = params.pr;     % pause rate
@@ -64,23 +63,14 @@ end
         'FontWeight', 'bold', ...
         'FontSize', 11);
 
-    ssss = data{1};
-    ssss(1,:)
-    ssss(7001,:)
-
-    %while (tt<tmax)
     for ind = 1:length(time)
 
-        % Check frame rate
-        %if (abs((fix(ptfac*tt)-ptfac*tt))/ptfac<dt)
         if mod(ind, ptfac) == 0 % I should be able to speed this up by
                                 % putting it in the for loop
 
             cla(ax,'reset');
-            
-            % Set the array index of desired time
-            %ind = floor(tt/dt)+1
 
+            % Collect slices of data for current frame
             to_send = cell([1,length(data)]);
             for k = 1:length(data)
                 arr = data{k};
@@ -96,6 +86,7 @@ end
                   Regions = reg, ...
                   Region_labels = regl);
 
+            % Update annotation tracking time
             a.String = sprintf('Time: %.2f',time(ind));
             
             pause(pr);

@@ -51,6 +51,7 @@ end
     data_l = length(data);
     to_plot = zeros([data_l,length(x)]);
 
+    % Collect data to plot
     for k = 1:data_l
         arr = data{k};
 
@@ -58,10 +59,6 @@ end
         if meta{k}.discrete
             arr = fatten_points_polynomial(x,arr,meta{k}.thickness);
         end
-
-        figure(k)
-        clf
-        plot(x,arr)
 
         to_plot(k,:) = arr;
     end
@@ -88,6 +85,7 @@ end
             color = ([220,220,220] + ([105,105,105]-[220,220,220])*k/si(1))/255;
         end
 
+        % Plot
         plot(ax,x,u,'linewidth',2,'DisplayName',name,'Color',color);
 
     end
@@ -98,12 +96,15 @@ end
     % If desired, show cutoff regions
     if reg
 
+        % Define cutoff functions
         ChiR = ct(r1,r2);
         ChiS = ct(s1,s2);
 
+        % Construct cutoff vectors
         ChiR = 1.1*m*ChiR(x);
         ChiS = 1.1*m*ChiS(x);
 
+        % Plot cutoffs
         temp1 = plot(ax,x,ChiR,'-','Color',[0,0,0]/255,'linewidth',1,'DisplayName','R');
         temp2 = plot(ax,x,ChiS,'-','Color',[150,150,150]/255,'linewidth',1,'DisplayName','S');
 
