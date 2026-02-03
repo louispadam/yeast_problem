@@ -20,7 +20,7 @@ end
     a1=params.s2*2*L-L;
     b0=params.r1*2*L-L;
     b1=params.r2*2*L-L;
-    del=params.del;     % for defining characteristic function via tanh
+    eps=params.eps;
     alpha=params.alph;  % term in linear influence
     ct=params.ct;
     msz=params.m_sz;
@@ -65,7 +65,6 @@ end
 
     % If default time-vector is longer than permitted, replace with max
     if sz > msz
-        disp('here')
         sz = msz;
         keep = steps/msz;
     end
@@ -91,10 +90,12 @@ end
         fprintf("Began Simulation\n");
     end
 
+    b = -2*L*1i*kx - (eps*(2*L)^2)*kx.^2;
+
     for step = 2:steps
 
         % Iterate
-        l_tm = exp(-2*L*1i*kx*h).*Uf;
+        l_tm = exp(b*h).*Uf;
         nl_tm = alpha*trapz(linspace(-L,L,N),ChiS.*real(ifft(Uf)))*...
                 fft(ChiR.*real(ifft(Uf))).*(1-exp(-2*L*1i*kx*h))/(2*L);
         % Below is an alternative method of calculating nl_tm. It doesn't
@@ -111,7 +112,6 @@ end
             data(k,:) = real(ifft(Uf));
             k = k+1;
             here = round(keep*k);
-            
         end
 
         % display update if desired

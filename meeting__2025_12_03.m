@@ -4,7 +4,7 @@
 % intended to compare results of simulating continuum and particle models
 % now that the issue of numerical diffusion has been effectively resolved.
 %
-% last updated 11/25/25 by Adam Petrucci
+% last updated 11/30/25 by Adam Petrucci
 
 %% Boilerplate
 
@@ -188,7 +188,7 @@ title("Periodic Distance in Particle System");
 ylabel('Distance');
 xlabel('Time');
 
-saveas(per_dist1,'per_dist1.png')
+%saveas(per_dist1,'per_dist1.png')
 
 %%
 
@@ -206,7 +206,7 @@ title("Cumulative Distribution of Continuous System");
 ylabel('Distance');
 xlabel('Time');
 
-saveas(d_c_cum_fig,'d_c_cum.png')
+%saveas(d_c_cum_fig,'d_c_cum.png')
 
 %% Compute Long-term relative particle distances in time
 
@@ -220,7 +220,7 @@ compare02 = dist_per(p0,p2,1);
 %% Visualize long-term relative particle distances in time
 
 per_analy_p = figure(7);
-clf('reset',per_anal_p)
+clf('reset',per_analy_p)
 hold on
 
 plot(1:length(equi(end-1000:end,1)),compare01(end-1000:end))
@@ -230,7 +230,7 @@ title("Periodic Analysis of Particles")
 ylabel("Periodic Distance")
 xlabel("Time")
 
-saveas(per_analy_p,'per_analy_p.png')
+%saveas(per_analy_p,'per_analy_p.png')
 
 %%
 
@@ -274,4 +274,40 @@ title("Periodic Analysis of Continuum")
 ylabel("Periodic Distance")
 xlabel("Time")
 
-saveas(per_analy_c,'per_analy_c.png')
+%saveas(per_analy_c,'per_analy_c.png')
+
+%% Figure for Website
+
+website_frame = figure(20);
+clf(website_frame);
+ax = axes(website_frame);
+
+% [253,179,102]/255
+frame(x,parameters,ax,...
+      "Data",{ic_p,d_p(5000,:)},...
+      "Meta",{struct('name',"Initial State", ...
+                     'discrete',true, ...
+                     'color',[253,149,72]/255, ...
+                     'thickness',parameters.del)...
+              struct('name',"Ending State", ...
+                     'discrete',true, ....
+                     'color',[110,166,205]/255, ...
+                     'thickness',parameters.del)}, ...
+      "Legend",true,...
+      "Regions",false,...
+      "Region_labels",false,...
+      "Title","Particle Clustering in Yeast");
+
+p = ax.Position;
+a = annotation('textbox', ...
+    [p(1)+0.15*p(3),p(2)+0.8*p(4), 0.1, 0.1], ...
+    'String', sprintf('Transition:\n4-peak  >>  3-peak'), ...
+    'EdgeColor', 'none', ...
+    'HorizontalAlignment', 'center', ...
+    'VerticalAlignment', 'middle', ...
+    'FontWeight', 'bold', ...
+    'FontSize', 11);
+
+%saveas(website_frame,'graphic_yeast.png')
+
+disp('for site')
