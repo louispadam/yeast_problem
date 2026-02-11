@@ -219,13 +219,22 @@ for s1 = 1:length(s1_vals)
             end
         end
     end
+
+    save(sprintf('02_03_data_%dof%d.mat',s1,length(s1_vals)),'exp_colec','-v7.3')
+
 end
 
 disp('Completed experiment')
 
 %%
 
-save('big_exp_first_s1.mat','exp_colec','-v7.3')
+save('02_03_data_full.mat','exp_colec','-v7.3')
+
+disp('Done Saving')
+
+%%
+
+save('02_03_ic.mat',"ic_p")
 
 disp('Done Saving')
 
