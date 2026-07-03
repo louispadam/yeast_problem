@@ -11,27 +11,35 @@ function return_data = stationary_soln_vm(x,params)
     S = s2-s1;
 
     % Calculate inital guess in eps\to\infty case
-    a0 = (sqrt((1+alph*S)^2+4*alph*S*(r-1))-(1+alph*S))/(2*alph*S*(r-1));
-    g0 = 1-alph*a0*S;
+    au = (sqrt((1+alph*S)^2+4*alph*S*(r-1))-(1+alph*S))/(2*alph*S*(r-1));
+    gu = 1-alph*au*S;
 
-    s1i = mod(s1 - r1,1);
-    s2i = mod(s2 - r1,1);
+    ff = @(x) (au).*(x>=r) + ...
+              (au/gu).*(x<r);
 
-    % Run built-in Matlab solver
-    for_solve = @(v) fun(v,eps,alph,r,s1i,s2i);
+    if eps ~= 0
 
-    %options = optimoptions('fsolve','Display','none','PlotFcn',@optimplotfirstorderopt);
-    options = optimoptions('fsolve','Display','none');
-    soln = fsolve(for_solve,[a0,g0],options);
+        s1i = mod(s1 - r1,1);
+        s2i = mod(s2 - r1,1);
 
-    au = soln(1);
-    gu = soln(2);
-    bu = ss_b(au,gu,r);
-    cu = ss_c(au,gu,r);
+        % Run built-in Matlab solver
+        for_solve = @(v) fun(v,eps,alph,r,s1i,s2i);
 
-    % Construct solution
-    ff = @(x) (au + bu*exp((r-x)/eps^2)).*(x>=r) + ...
-              (au/gu + cu*exp(-gu*x/eps^2)).*(x<r);
+        %options = optimoptions('fsolve','Display','none','PlotFcn',@optimplotfirstorderopt);
+        options = optimoptions('fsolve','Display','none');
+        soln = fsolve(for_solve,[au,gu],options);
+
+        au = soln(1);
+        gu = soln(2);
+
+        bu = ss_b(au,gu,r);
+        cu = ss_c(au,gu,r);
+
+        % Construct solution
+        ff = @(x) ff(x) + (bu*exp((r-x)/eps^2)).*(x>=r) + ...
+                          (cu*exp(-gu*x/eps^2)).*(x<r);
+
+    end
 
     yy = ff(x);
     rs = length(x)-round(r1*length(x));

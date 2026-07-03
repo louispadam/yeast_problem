@@ -17,7 +17,9 @@ end
 
     % Construct CDF of dist
     %cumtrapz is cumulative integration via trapezoid method
-    pdf_vals = dist(x_data);
+    
+    pdf_vals = dist; % fix this later
+    %pdf_vals = dist(x_data);
     cdf_vals = cumtrapz(x_data, pdf_vals);
 
     % Invert CDF and sample
