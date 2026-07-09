@@ -1,3 +1,4 @@
+# These files are for data analysis, collection, and storage.
 *main*
 *.asv
 *private*
@@ -6,3 +7,11 @@ images
 *.png
 *.mat
 *.mp4
+
+
+# The following are old files whose functionality has been adapted into
+# others. I am leaving them on my local machine for reference, but they
+# are not needed in the repository.
+derivative_noise.m
+particle_feuler_noise.m
+stationary_soln_v.m

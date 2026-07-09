@@ -1,6 +1,8 @@
 function [return_time, return_data]=cont_sudospec_etd_rk4(initial,parameters)
 %
-%last updated 11/07/25 by Adam Petrucci
+%WARNING: this function is not yet ready for use
+%
+%last updated 07/06/26 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation

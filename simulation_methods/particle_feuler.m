@@ -1,7 +1,8 @@
 function [return_time, return_data] = particle_feuler(initial,parameters)
-%FORWARD_EULER simulates the yeast NODE using a forward-euler algorithm.
+%FORWARD_EULER simulates the yeast NODE using a forward-euler algorithm. It
+%can handle both noise (via Euler-Maruyama) and noise-less scenarios
 %
-%last updated 08/30/25 by Adam Petrucci
+%last updated 07/06/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     parameters struct   % parameters for simulation
