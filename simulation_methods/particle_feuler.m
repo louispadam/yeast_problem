@@ -1,4 +1,4 @@
-function [return_time, return_data] = particle_feuler(initial,parameters)
+function [return_time, return_data, return_clock] = particle_feuler(initial,parameters)
 %FORWARD_EULER simulates the yeast NODE using a forward-euler algorithm. It
 %can handle both noise (via Euler-Maruyama) and noise-less scenarios
 %
@@ -10,7 +10,11 @@ end
 arguments (Output)
     return_time (1,:)   % discretized time axis of simulation
     return_data (:,:)   % simulation results: [time,data]
+    return_clock
 end
+
+    % Begin timer
+    tic
     
     %****************************
     % Collect Inputs
@@ -86,13 +90,16 @@ end
 
     end
 
+    end_time = toc;
+
     % Return data
     return_time = time;
     return_data = data;
+    return_clock = end_time;
 
     % update if desired
     if ud
-        fprintf('Completed Simulation\n')
+        fprintf('Completed Simulation in %f seconds\n',end_time)
     end
 
 end

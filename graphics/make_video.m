@@ -117,11 +117,12 @@ end
                 a.String = sprintf('Time: %.2f',time(ind));
             end
 
+            % update height of regions to match data
             if ax.YLim < m
                 ax.YLim = [0 m*1.1];
                 if reg
-                    handles(1).YData = 1.1*m*ChiR(x);
-                    handles(2).YData = 1.1*m*ChiS(x);
+                    handles(2).YData = 1.1*m*ChiR(x);
+                    handles(1).YData = 1.1*m*ChiS(x);
                 end
             end
             writeVideo(v, getframe(fig));
