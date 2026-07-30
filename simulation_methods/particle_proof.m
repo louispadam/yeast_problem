@@ -25,10 +25,9 @@ end
 
     ic = initial;
     params = parameters;
-    fxd_dt = options.Timestep;
+    dt = options.Timestep;
 
     % Define Temporal parameters
-    dt = params.dt;
     t_final = params.tfin;
     msz=params.m_sz;
     ud=params.update;
@@ -44,11 +43,11 @@ end
     ic = mod(ic-params.r2,1);
     N = length(ic); % number of particles
 
-    if fxd_dt > s1_tilde
-        fprintf('Using default timestep of %.4f\n',s1_tilde)
+    if dt > s1_tilde
+        fprintf('Given timestep too big,\nUsing default of %.4f instead\n',s1_tilde)
         %compute delta
         %in new coords, s1-r2=s1
-        fxd_dt = s1_tilde; % otherwise known as |delta|
+        dt = s1_tilde; % otherwise known as |delta|
     end
 
     % Define stepping for iteration

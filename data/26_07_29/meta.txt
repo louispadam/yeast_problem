@@ -1,0 +1,10 @@
+comparison.png and euler_error.png run with geometry dependent on delta according to code
+
+parameters.s1 = del/2;
+parameters.s2 = del/2 + 0.3;
+parameters.r1 = 0.7 - del/2;
+parameters.r2 = 1 - del/2;
+
+range of deltas for comparison.png available in dt_0_01_delta. euler_error.png used delta = 0.2
+
+All run with simulation endtime of tfin = 40, sharp cutoffs, and alpha=0.9

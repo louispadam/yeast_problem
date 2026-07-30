@@ -46,18 +46,18 @@ end
 
     [d, labels] = sort(ic);   % iteration vector for data
 
-    tt = 0;        % iteration value for time
-    ref_lab = 0;   % label for reference particle
-    ref_pos = 0;   % initial position of reference particle
-    iterate_counter = 1;
+    tt = 0;         % iteration value for time
+    %ref_lab = 0;   % label for reference particle
+    %ref_pos = 0;   % initial position of reference particle
+    %iterate_counter = 1;
     if ~any((d > s1_tilde) .* (d < s2_tilde))
         if ~any(d < s1_tilde)
             ref_lab = N;
             ref_pos = d(end);
             tt = s1_tilde - ref_pos + 1;
         else
-            [val, ref_lab] = find(d < s1_tilde,'last');
-            ref_pos = val;
+            ref_lab = find(d < s1_tilde,'last');
+            ref_pos = d(ref_lab);
             tt = s1_tilde - ref_pos;
         end
         d = mod(d + tt,1);
@@ -66,10 +66,11 @@ end
             d = [d(j+1:end), d(1:j)];
             labels = [labels(j+1:end), labels(1:j)];
         end
-        %iterate_counter = 2;
     else
-        [ref_pos, ref_lab] = find(d > s1_tilde,1,'first');
+        ref_lab = find(d > s1_tilde,1,'first');
+        ref_pos = d(ref_lab);
     end
+    ref_lab = labels(ref_lab);
 
     if fxd_dt > s1_tilde
         fprintf('Using default timestep of %.4f\n',s1_tilde)
@@ -78,34 +79,11 @@ end
         fxd_dt = s1_tilde; % otherwise known as |delta|
     end
 
-    % Define stepping for iteration
-    %steps = round(t_final/min(dt, s1_tilde) + 1);
-    %sz = steps;
-    %keep = 1;   % frequency with which to store iteration
-
-    % If default time-vector is longer than permitted, replace with max
-    %if sz > msz
-    %    sz = msz;
-    %    keep = steps/msz;
-    %end
-
-    % Define time and space vectors to store
-    %time = zeros([1,sz]);
-    %data = zeros([sz,length(ic)]);
-    %data(1,:) = ic;
-
-    time = zeros([1,1000]);
-    time(iterate_counter) = tt;
-    data = zeros([1000,length(ic)]);
-    data(iterate_counter,labels) = d;
-
     kk = 1; % revolution counter
-    %kk = 2;      % counter for storing iteration
-    %here = round(keep*kk);
-
-    % Prepare frequency of updates (if desired)
-    %pb = round(linspace(2,steps,20));
-    %n_pb = 1;
+    time = zeros([1,1000]);
+    time(kk) = tt;
+    data = zeros([1000,length(d)]);
+    data(kk,labels) = d;
 
     %****************************
     % Iterate!
@@ -119,12 +97,11 @@ end
     new_rev = false;
     converged = false;
 
-    %for step = 2:steps
     while ~converged && (tt < t_final)
 
         dt = fxd_dt;
-        check_ref = ref_pos - d(mod(ref_lab - labels(end),N)+1);
-        if (check_ref > 0) && check_ref < fxd_dt && ...
+        check_ref = ref_pos - d(labels == ref_lab);
+        if (check_ref > 0) && (check_ref < fxd_dt) && ...
                               ~(abs(check_ref) < 1e-10)
            dt = check_ref;
            new_rev = true;
@@ -211,34 +188,13 @@ end
 
         tt = tt + dt;
 
-        % Store result at previously calculated frequency
-        %if step == here
-        %    time(kk) = tt;
-        %    data(kk,labels) = d;
-        %    kk = kk+1;
-        %    here = round(keep*kk);
-        %end
         if new_rev
             kk = kk+1;
             time(kk) = tt;
             data(kk,labels) = d;
-            converged = metric_wasserstein1(data(kk,:),data(kk-1,:)) < 1e-4;
-            disp(metric_wasserstein1(data(kk,:),data(kk-1,:)))
-
-            %test_frame = figure(16);
-            %clf(test_frame);
-            %ax = axes(test_frame);
-            %frame(linspace(0,1,2^11),parameters,ax,...
-            %"Data",{data(kk,:)},...
-            %"Meta",{struct('name',"Proof Scheme", ...
-            %                 'discrete',true, ....
-            %                 'color',[253,179,56]/255, ...
-            %                 'thickness',parameters.del)}, ...
-            %"Legend",true,...
-            %"Regions",true,...
-            %"Region_labels",true,...
-            %"Title","Final Conditions");
-            %pause(1)
+            converged = metric_wasserstein1(data(kk,:),data(kk-1,:)) < 1e-8;
+            %cc(kk) = metric_wasserstein1(data(kk,:),data(kk-1,:));
+            new_rev = false;
         end
 
         % display update if desired
@@ -247,15 +203,16 @@ end
         %    n_pb = n_pb + 1;
         %end
 
-        iterate_counter = iterate_counter + 1;
-
     end
+
+    %figure(9)
+    %plot(cc)
 
     end_time = toc;
 
     % Return data
-    return_time = time(1:iterate_counter);
-    data = data(1:iterate_counter,:);
+    return_time = time(1:kk);
+    data = data(1:kk,:);
     return_data = mod(data + params.r2,1);
     return_clock = end_time;
 

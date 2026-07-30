@@ -1,4 +1,4 @@
-function return_data = boiler_plate()
+function return_data = instantiate_parameters()
 
     % Generate parameter structure
     parameters = struct(...
