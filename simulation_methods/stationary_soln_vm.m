@@ -3,6 +3,9 @@ function return_data = stationary_soln_vm(x,params)
 %linear influence function with diffusion as grained by the vector x by
 %solving fixed point problem (really it finds the zero)
 %
+%WARNING: this method was found to be theoretically unsound and has not yet
+%been fixed.
+%
 %last updated 07/06/26 by Adam Petrucci
 arguments (Input)
     x           % input vector on which to compute solution
@@ -63,15 +66,15 @@ end
 
 % Calculate b from a, g, and r
 function return_data = ss_b(a,g,r)
-    num = a*(1/g-1)*(1-exp(g*r/eps^2))
-    den = (1-exp((r*(g-1)+1)/eps^2))
+    num = a*(1/g-1)*(1-exp(g*r/eps^2));
+    den = (1-exp((r*(g-1)+1)/eps^2));
     return_data = num/den;
 end
 
 % Calculate c from a, g, and r
 function return_data = ss_c(a,g,r)
-    num = a*(1/g-1)*(exp((r-1)/eps^2)-1)
-    den = 1-exp((r*(g-1)+1)/eps^2)
+    num = a*(1/g-1)*(exp((r-1)/eps^2)-1);
+    den = 1-exp((r*(g-1)+1)/eps^2);
     return_data = num/den;
 end
 
@@ -84,17 +87,13 @@ end
 % Map to find zero of
 function f = fun(v,eps,alpha,r,s1,s2)
 
-    v
-
     ai = v(1);
     gi = v(2);
 
-    bi = ss_b(ai,gi,r)
-    ci = ss_c(ai,gi,r)
+    bi = ss_b(ai,gi,r);
+    ci = ss_c(ai,gi,r);
 
     f(1) = ai*(1-r)+ai*r/gi-bi*eps^2*(exp((1-r)/eps^2)-1)-ci*eps^2*(exp(gi*r/eps^2)-1)/gi-1;
     f(2) = ss_g(ai,bi,alpha,s1,s2) - gi;
-
-    f
 
 end

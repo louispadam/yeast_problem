@@ -1,10 +1,12 @@
-function return_data = make_video(x_data,parameters,fig,options)
+function return_data = make_video(x_data,params,fig,options)
 arguments (Input)
-    x_data                       % discretization in x-coordinate
-    parameters struct       % parameters used for simulation
-    fig                     % figure to work from
+    x_data              % discretization in x-coordinate
+    params struct       % parameters used for simulation
+    fig                 % figure to work from
 end
 arguments (Input)
+    options.Frame_rate = 1                  % frame rate
+    options.Pause_rate = 1/30               % pause rate
     options.Regions logical = false         % show regions?
     options.Region_labels logical = false   % add regions to legend?
     options.Data = {}                       % data to plot
@@ -17,6 +19,9 @@ arguments (Input)
     options.Title = ""                      % title of axis
     options.Legend logical = false          % include legend?
 end
+arguments (Output)
+    return_data      % bool for success or failure
+end
 
     %****************************
     % Collect Inputs
@@ -25,32 +30,21 @@ end
     clf(fig);
 
     % Required Inputs
-    x = x_data;
-    params = parameters;
     ax = axes(fig);
 
     % Optional Inputs
     reg = options.Regions;
-    regl = options.Region_labels;
     data = options.Data;
     meta = options.Meta;
-    tit = options.Title;
-    leg = options.Legend;
     time = options.Time;
-
-    %****************************
-    % Define Temporal Parameters
-    %****************************
-    dt=parameters.dt;       % simulation time step
-    tt=0;               % current time
-    ptfac=parameters.fr;    % frame rate
+    ptfac = options.Frame_rate;
 
     %****************************
     % Run Animation
     %****************************
 
     v = VideoWriter('output.mp4','MPEG-4');
-    v.FrameRate = 30;         % Adjust for smoothness
+    v.FrameRate = 1/options.Pause_rate;
     open(v);
 
     to_send = cell([1,length(data)]);
@@ -58,13 +52,13 @@ end
         arr = data{k};
         to_send{k} = arr(1,:);
     end
-    frame(x,params,ax, ...
+    frame(x_data,params,ax, ...
           Data = to_send, ...
           Meta = meta, ...
-          Title = tit, ...
-          Legend = leg, ...
+          Title = options.Title, ...
+          Legend = options.Legend, ...
           Regions = reg, ...
-          Region_labels = regl);
+          Region_labels = options.Region_labels);
     if reg
         ChiR = params.ct(params.r1,params.r2);
         ChiS = params.ct(params.s1,params.s2);
@@ -93,15 +87,13 @@ end
         if mod(ind, ptfac) == 0 % I should be able to speed this up by
                                 % putting it in the for loop
 
-            %cla(ax,'reset');
-
             % Collect slices of data for current frame
             b = length(data) + 2 * reg;
             m = 0;
             for k = 1:length(data)
                 arr = data{k};
                 if meta{k}.discrete
-                    handles(b).YData = fatten_points_polynomial(x,arr(ind,:),meta{k}.thickness);
+                    handles(b).YData = fatten_points_polynomial(x_data,arr(ind,:),meta{k}.thickness);
                 else
                     handles(b).YData = arr(ind,:);
                 end
@@ -121,14 +113,14 @@ end
             if ax.YLim < m
                 ax.YLim = [0 m*1.1];
                 if reg
-                    handles(2).YData = 1.1*m*ChiR(x);
-                    handles(1).YData = 1.1*m*ChiS(x);
+                    handles(2).YData = 1.1*m*ChiR(x_data);
+                    handles(1).YData = 1.1*m*ChiS(x_data);
                 end
             end
             writeVideo(v, getframe(fig));
 
         end
-        tt=tt+dt; % Update time
+
     end
 
     return_data = 1;

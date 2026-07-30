@@ -1,5 +1,7 @@
 function [return_time return_data] = particle_fem_feuler(x,initial,parameters)
 %
+%WARNING: this function is not yet ready for use
+%
 %last updated 11/07/25 by Adam Petrucci
 
     tic;

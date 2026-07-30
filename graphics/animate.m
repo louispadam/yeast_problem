@@ -2,6 +2,11 @@ function return_data = animate(x_data,parameters,axis,options)
 %ANIMATE Animate a collection of simulations. Accepts a cell array, each
 %element of which is an 2d array of data: time x particle.
 %
+%WARNING: this method is depreciated. You should use make_video instead
+%
+%WARNING: this method was not kept up to date with project restructuring.
+%For instance, the parameters structure has been redesigned.
+%
 %last updated 10/07/25 by Adam Petrucci
 arguments (Input)
     x_data (1,:) double     % discretization of domain

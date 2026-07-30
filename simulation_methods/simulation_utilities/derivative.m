@@ -1,4 +1,4 @@
-function return_data = derivative(parameters,curr_state)
+function return_data = derivative(parameters,curr_state,dt)
 %DERIVATIVE calculates the derivative of a particle assuming linear
 %interaction.
 %
@@ -6,6 +6,7 @@ function return_data = derivative(parameters,curr_state)
 arguments (Input)
     parameters struct    % parameters for simulation
     curr_state (1,:)     % current state of the system
+    dt                   % step to take
 end
 
     % Collect Inputs
@@ -18,7 +19,6 @@ end
     r1 = params.r1;
     r2 = params.r2;
     eps = params.eps;
-    dt = params.dt;
     alph = params.alph;
     ct = params.ct;
 

@@ -1,20 +1,38 @@
-function [return_time, return_data]=cont_sudospec_etd_feuler(initial,parameters)
+function [return_time, return_data, return_clock]=cont_sudospec_etd_feuler(initial,params,options)
+%CONT_SUDOSPEC_ETD_FEULER simulates the yeast Vlasov-McKean PDE using 
+%pseudospectral methods with exponentil time differencing.
 %
-%last updated 11/07/25 by Adam Petrucci
-arguments
+%last updated 07/30/25 by Adam Petrucci
+arguments (Input)
     initial (1,:)       % initial conditions
-    parameters struct   % parameters for simulation
+    params struct   % parameters for simulation
 end
+arguments (Input)
+    options.Timestep = 0.01  % timestep for simulation
+    options.EndTime = 40     % maximum simulation time
+    options.Update = true    % whether or not to regularly print updates
+                             % Default: Deliver updates
+    options.M_SZ = 2^15/length(initial) % bound on size of storage object
+                                        % so Matlab doesn't complain
+end
+arguments (Output)
+    return_time (1,:)   % discretized time axis of simulation
+    return_data (:,:)   % simulation results: [time,data]
+    return_clock
+end
+
+    % Begin timer
+    tic
 
     %****************************
     % Collect Inputs
     %****************************
     ic = initial;
-    params = parameters;
 
     %****************************
     % System Parameters
     %****************************
+
     L=2*pi;
     a0=params.s1*2*L-L;
     a1=params.s2*2*L-L;
@@ -23,8 +41,8 @@ end
     eps=params.eps;
     alpha=params.alph;  % term in linear influence
     ct=params.ct;
-    msz=params.m_sz;
-    ud=params.update;
+
+    ud = options.Update;
 
     %******************************
     % Set up Fourier Transform
@@ -52,9 +70,9 @@ end
     %***************************************************
     % Set up iteration
     %**************************************************
-    h=params.dt;
-    t_final = params.tfin;
-    U=ic;
+    h = options.Timestep;
+    t_final = options.EndTime;
+    U = ic;
     Uf = fft(U);
     tt=0;
 
@@ -64,6 +82,7 @@ end
     keep = 1;   % frequency with which to store iteration
 
     % If default time-vector is longer than permitted, replace with max
+    msz = options.M_SZ;
     if sz > msz
         sz = msz;
         keep = steps/msz;
@@ -121,14 +140,17 @@ end
         end
 
     end
+    
+    end_time = toc;
 
     % Return data
     return_time = time;
     return_data = data;
+    return_clock = end_time;
 
     % update if desired
     if ud
-        fprintf('Completed Simulation\n')
+        fprintf('Completed Simulation in %f seconds\n',end_time)
     end
 
 end

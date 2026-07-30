@@ -1,11 +1,12 @@
-function return_data = frame(x_data,parameters,axis,options)
+function return_data = frame(x_data,params,axis,options)
 %FRAME Present simulation data on a provided axis handle. Accepts a cell
-% array, each element of which is a vector of particles.
+% array, each element of which is a vector or discretized continuum of
+% particles.
 %
 %last updated 10/07/25
 arguments (Input)
     x_data (1,:) double     % discretization of domain
-    parameters struct       % parameters used for simulation
+    params struct       % parameters used for simulation
     axis                    % axis to format
 end
 arguments (Input)
@@ -16,9 +17,12 @@ arguments (Input)
                                                 % name (string)
                                                 % discrete (boolean)
                                                 % color (rgb)
-                                                % thickness (double)
+                                                % smoothing (double)
     options.Title = ""                      % title of axis
     options.Legend logical = false          % include legend?
+end
+arguments (Output)
+    return_data    % axis into which the data has been plotted
 end
 
     %****************************
@@ -27,16 +31,11 @@ end
 
     % Required Inputs
     x = x_data;
-    params = parameters;
     ax = axis;
 
     % Optional Inputs
-    reg = options.Regions;
-    regl = options.Region_labels;
     data = options.Data;
     meta = options.Meta;
-    tit = options.Title;
-    leg = options.Legend;
 
     % Define Spatial Parameters
     s1 = params.s1;
@@ -94,7 +93,7 @@ end
     m = max(to_plot,[],"all");
 
     % If desired, show cutoff regions
-    if reg
+    if options.Regions
 
         % Define cutoff functions
         ChiR = ct(r1,r2);
@@ -109,7 +108,7 @@ end
         temp2 = plot(ax,x,ChiS,'-','Color',[150,150,150]/255,'linewidth',1,'DisplayName','S');
 
         % If not desired, remove cutoff labels from legend
-        if ~regl
+        if ~options.Region_labels
             set(get(get(temp1, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
             set(get(get(temp2, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
         end
@@ -120,8 +119,8 @@ end
     ax.YLim = [0 m*1.1];
     ylabel(ax,'Density');
     xlabel(ax,'Position');
-    title(ax,tit,'Fontsize',18,'FontWeight', 'bold')
-    if leg
+    title(ax,options.Title,'Fontsize',18,'FontWeight', 'bold')
+    if options.Legend
         legend show
     end
 

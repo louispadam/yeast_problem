@@ -1,19 +1,30 @@
-function [return_time, return_data, return_clock] = particle_proof(initial,parameters,options)
+function [return_time, return_data, return_clock] = particle_proof(initial,params,options)
 %PARTICLE_PROOF simulates the yeast NODE using a scheme inspired from our
-%proof of the mean-field limit.
+%proof of the mean-field limit. It proceeds until convergence of a Poincare
+%map defined by some reference particle.
 %
-%last updated 07/22/26 by Adam Petrucci
+%last updated 07/30/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
-    parameters struct   % parameters for simulation
+    params struct       % parameters for simulation
 end
 arguments (Input)
-    options.Timestep = 2
+    options.EndTime = Inf    % maximum simulation time
+                             % Default: run until achieving convergence
+    options.Update = true    % whether or not to regularly print updates
+                             % Default: Deliver updates
+    options.Collect = false  % data to collect
+                             % Default: Returns only the first reference
+                             % state and the final state
+    options.Tolerance = 1e-8 % convergence tolerance
+                             % Default: some preliminary runs suggest this
+                             % to be a reasonable tolerance for catching
+                             % metastable states
 end
 arguments (Output)
     return_time (1,:)   % discretized time axis of simulation
     return_data (:,:)   % simulation results: [time,data]
-    return_clock
+    return_clock        % total real-time for simulation
 end
 
     % Begin timer
@@ -24,177 +35,263 @@ end
     %****************************
 
     ic = initial;
-    params = parameters;
-    dt = options.Timestep;
 
-    % Define Temporal parameters
-    t_final = params.tfin;
-    msz=params.m_sz;
-    ud=params.update;
+    t_final = options.EndTime;
+    ud = options.Update;
+    tol = options.Tolerance;
 
     %****************************
-    % Set up iteration
+    % Change coordinate System
     %****************************
+    % Change coordinate system so that r2_tilde = 1 = 0.
 
-    % change coordinate system so that r2_tilde = 1 = 0
     r1_tilde = mod(params.r1 - params.r2,1);
     s1_tilde = mod(params.s1 - params.r2,1);
     s2_tilde = mod(params.s2 - params.r2,1);
     ic = mod(ic-params.r2,1);
-    N = length(ic); % number of particles
+    N = length(ic);      % number of particles
 
-    if dt > s1_tilde
-        fprintf('Given timestep too big,\nUsing default of %.4f instead\n',s1_tilde)
-        %compute delta
-        %in new coords, s1-r2=s1
-        dt = s1_tilde; % otherwise known as |delta|
-    end
+    %****************************
+    % Set up Scheme
+    %****************************
+    % Set up initial state for proof-scheme, and instantiate counters and
+    % storage objects.
 
-    % Define stepping for iteration
-    steps = round(t_final/min(dt, s1_tilde) + 1);
-    sz = steps;
-    keep = 1;   % frequency with which to store iteration
-
-    % If default time-vector is longer than permitted, replace with max
-    if sz > msz
-        sz = msz;
-        keep = steps/msz;
-    end
-
+    % Scheme requires particles to be ordered.
+    % Saving labels preserves particle identities to be returned in same
+    % ordering as was inputted.
     [d, labels] = sort(ic);   % iteration vector for data
-    tt = 0;        % iteration value for time
+    tt = 0;                   % current time
 
-    % Define time and space vectors to store
-    time = zeros([1,sz]);
-    time(1) = tt;
-    data = zeros([sz,length(ic)]);
-    data(1,:) = ic;
+    % Find admissible reference particle.
+    % If no particle in S then evolve particles (with unit speed because
+    % there are no signaling particles) until leader reaches s1; leader
+    % serves as reference. Otherwise, reference is first particle past s1.
+    % ref_lab is label of reference particle and ref_pos is inital (after 
+    % possible rotation to s1) position of reference particle.
+    if ~any((d > s1_tilde) .* (d < s2_tilde))
+        if ~any(d < s1_tilde)
+            ref_lab = N;
+            ref_pos = d(end);
+            tt = s1_tilde - ref_pos + 1;
+        else
+            ref_lab = find(d < s1_tilde,'last');
+            ref_pos = d(ref_lab);
+            tt = s1_tilde - ref_pos;
+        end
+        d = mod(d + tt,1);
+        j = find(diff(d)<0,1);
+        if ~isempty(j)
+            d = [d(j+1:end), d(1:j)];
+            labels = [labels(j+1:end), labels(1:j)];
+        end
+    else
+        ref_lab = find(d > s1_tilde,1,'first');
+        ref_pos = d(ref_lab);
+    end
+    ref_lab = labels(ref_lab);
 
-    kk = 2;      % counter for storing iteration
-    here = round(keep*kk);
+    % State upon previous revolution (for convergence criterion)
+    prior = d;
 
-    % Prepare frequency of updates (if desired)
-    pb = round(linspace(2,steps,20));
-    n_pb = 1;
+    % Automatically use optimal timestep
+    fxd_dt = s1_tilde;
+
+    % Instantiate storage objects according to whether user calls for data
+    % at every revolution or only the final state.
+    collect = options.Collect;
+    if collect
+        time = zeros([1,1000]);            % time vector (dynamic)
+        data = zeros([1000,length(ic)]);    % state vector (dynamic)
+    else
+        time = zeros(1);
+        data = zeros([1,length(ic)]);
+    end
+
+    % Assign first time and state
+    kk = 1;                            % revolution counter
+    time(kk) = tt;                     % save first time
+    data(kk,labels) = d;               % save first state
 
     %****************************
-    % Iterate!
+    % Iterate
     %****************************
 
-    % updates if desired
+    % Give progress update (if desired).
     if ud
         fprintf("Began Simulation\n");
     end
 
-    for step = 2:steps
+    new_rev = false;    % bool for completing a revolution
+    converged = false;  % bool for acheiving convergence
 
-        % determine particles that interact with S
+    % Run scheme until either 1) convergence is achieved or 2) reach
+    % maximum designated simulation time.
+    while ~converged && (tt < t_final)
+
+        % Check if standard step would skip revolution (relative to
+        % reference particle). If so, adjust timestep.
+        dt = fxd_dt;
+        check_ref = ref_pos - d(labels == ref_lab);
+        if (check_ref > 0) && (check_ref < fxd_dt) && ...
+                              ~(abs(check_ref) < 1e-10)
+           dt = check_ref;
+           new_rev = true;
+        end
+
+        % Find particles that interact with S during step
         s_set = d(d > s1_tilde - dt & d < s2_tilde);
-        % determine particles that enter S
+
+        % Find particles that enter S during step
         enter_s = s1_tilde - s_set;
         enter_s = enter_s(enter_s > 0);
 
-        % determine particles that leave S
+        % Find particles that leave S during step
         exit_s  = s2_tilde - s_set;
         exit_s  = exit_s(exit_s < dt);
 
-        % order event times and respective changes in S population
-        times = [enter_s, exit_s];
+        % Order event times and compute respective changes in S population
+        event_times = [enter_s, exit_s];
         jumps = [ones(size(enter_s)),-ones(size(exit_s))];
-        [times,idx] = sort(times);
+        [event_times,idx] = sort(event_times);
         jumps = jumps(idx);
 
-        % compute population after each event
-        N0 = sum(d >= s1_tilde & d < s2_tilde);
+        % Compute S population after each event
+        N0 = sum(d >= s1_tilde & d < s2_tilde);  % initial population
         Ns = N0 + [0, cumsum(jumps)];
 
-        % compute speed after each event
+        % Compute speed in R after each event
         speeds = 1 - params.alph*Ns/N;
 
-        % add boundary times and compute net displacement
-        tau = [0, times, dt];
-        Htau = [0, cumsum(speeds .* diff(tau))];
+        % Add boundary times and compute net displacement for particle in R
+        times = [0, event_times, dt];
+        H = [0, cumsum(speeds .* diff(times))];
 
-        % determine particles that interact with R
-        % in new coords, r2=1 so x<r2 is trivial
+        % Find particles that interact with R during step
+        % In new coords, r2=1 so x<r2 is trivial
         r_array = d > r1_tilde-dt;
         r_set = d(r_array);
         r_ind = find(r_array);
 
-        % particles' starting points relative to R
+        % Compute particles' starting points relative to R
+        % i.e. whether they start in R or reach R during the step
         base = max(r_set, r1_tilde);
 
-        % compute entry times
-        entry_times = zeros(size(r_set));
+        % Compute entry times in R
+        entry_times_r = zeros(size(r_set));
         enter_r = r_set < r1_tilde;
-        entry_times(enter_r) = r1_tilde - r_set(enter_r);
+        entry_times_r(enter_r) = r1_tilde - r_set(enter_r);
 
-        % compute correction for H
+        % Compute H at entry time
+        % This leverages monotonicity of the state vector for speed
         Hcorr = zeros([1,length(r_set)]);
         k = 1;
-        for i = flip(1:length(entry_times))
-            while k < length(tau) && tau(k+1) <= entry_times(i)
+        for i = flip(1:length(entry_times_r))
+            while k < length(times) && times(k+1) <= entry_times_r(i)
                 k = k + 1;
             end
-            Hcorr(i) = Htau(k) + speeds(k)*(entry_times(i) - tau(k)); % H at entry time
+            Hcorr(i) = H(k) + speeds(k)*(entry_times_r(i) - times(k)); % H at entry time
         end
 
-        % compute displacement of particles interacting with R
+        % Compute displacement of particles interacting with R
+        % This leverages monotonicity of the state vector for speed
         targets = 1 - base + Hcorr;
         k = 1;
         for i = flip(1:length(r_set))
-            while k < length(Htau) && Htau(k+1) <= targets(i)
+            while k < length(H) && H(k+1) <= targets(i)
                 k = k + 1;
             end
-            if k == length(Htau)
-                d(r_ind(i)) = base(i) + Htau(end) - Hcorr(i);
-            else
-                exit_time = (targets(i)-Htau(k))/(speeds(k)) + tau(k);
-                % technically, the next line is r2+... but r2=1=0
+            if k == length(H) % particle doesn't leave R in step
+                d(r_ind(i)) = base(i) + H(end) - Hcorr(i);
+            else              % particle left R during step
+                exit_time = (targets(i)-H(k))/(speeds(k)) + times(k);
                 d(r_ind(i)) = 1 + dt - exit_time;
             end
         end
 
-        % compute displacement of all other particles
+        % Compute displacement of all particles that do not interact with R
         d(~r_array) = d(~r_array) + dt;
 
+        % Correct for periodicity
         d = mod(d,1);
 
+        % Resort state vector to ensure monotonicity, and update labels
+        % accordingly.
         j = find(diff(d)<0,1);
-
         if ~isempty(j)
             d = [d(j+1:end), d(1:j)];
             labels = [labels(j+1:end), labels(1:j)];
         end
 
+        % Update current time
         tt = tt + dt;
 
-        % Store result at previously calculated frequency
-        if step == here
-            time(kk) = tt;
-            data(kk,labels) = d;
+        % If the current step completed a revolution, save data and test
+        % for convergence.
+        if new_rev
+
             kk = kk+1;
-            here = round(keep*kk);
-        end
 
-        % display update if desired
-        if ud && step == pb(n_pb)
-            fprintf('Simulation Progress: %3.0f%%\n',100*step/steps)
-            n_pb = n_pb + 1;
-        end
+            % Update data storage
+            if collect
+                time(kk) = tt;
+                data(kk,labels) = d; % store according to original positions
+                
+                % Check if storage vectors need to be extended
+                if kk == length(time)
+                    time(end + 1000) = 0;
+                    data(end + 1000,:) = 0;
+                end
+            end
 
+            % Check for convergence
+            converged = metric_wasserstein1(d,prior) < tol;
+
+            % Reset revolution counter
+            new_rev = false;
+
+            % Update previous revolution state
+            prior = d;
+
+            % Give progress update (if desired).
+            if ud && (mod(kk,100) == 0)
+                fprintf('Reached revolution %d at time %.2f\n',kk,tt);
+            end
+
+        end % of revolution block
+
+    end % of while loop
+
+    % If only request final state, store it now
+    if ~collect
+        time(2) = tt;
+        data(2,labels) = d; % store according to original positions
     end
 
+    % Stop timer
     end_time = toc;
 
-    % Return data
-    return_time = time;
-    return_data = mod(data + params.r2,1);
+    % Return data, truncating storage objects appropriately and reverting
+    % the change of coordinates
+    data = mod(data + params.r2,1);
+    if collect
+        return_time = time(1:kk);
+        data = data(1:kk,:);
+        return_data = data;
+    else
+        return_time = time;
+        return_data = data;
+    end
     return_clock = end_time;
 
-    % update if desired
+    % Give progress update (if desired).
     if ud
-        fprintf('Completed Simulation in %f seconds\n',end_time)
+        fprintf('Completed Simulation in %f seconds ',end_time);
+        if tt >= t_final
+            fprintf('hitting end time wall');
+        else
+            fprintf('with convergence\n');
+        end
     end
 
-end
+end % of whole function

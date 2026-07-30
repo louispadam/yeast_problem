@@ -2,6 +2,9 @@ function [return_time, return_data]=cont_sudospec_beuler(initial,parameters)
 %PSEUDOSPECTRAL simulates the yeast Vlasov-McKean PDE using pseudospectral
 %techniques
 %
+%WARNING: this method was not kept up to date with project restructuring.
+%For instance, the parameters structure has been redesigned.
+%
 %last updated 11/07/25 by Adam Petrucci
 arguments
     initial (1,:)       % initial conditions
