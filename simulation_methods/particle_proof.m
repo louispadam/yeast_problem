@@ -1,9 +1,9 @@
-function [return_time, return_data, return_clock] = particle_proof(initial,params,options)
+function [return_time, return_data, return_clock, return_conv] = particle_proof(initial,params,options)
 %PARTICLE_PROOF simulates the yeast NODE using a scheme inspired from our
 %proof of the mean-field limit. It proceeds until convergence of a Poincare
 %map defined by some reference particle.
 %
-%last updated 07/30/26 by Adam Petrucci
+%last updated 08/03/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct       % parameters for simulation
@@ -20,11 +20,13 @@ arguments (Input)
                              % Default: some preliminary runs suggest this
                              % to be a reasonable tolerance for catching
                              % metastable states
+    options.Track = false    % collect and return convergence data
 end
 arguments (Output)
     return_time (1,:)   % discretized time axis of simulation
     return_data (:,:)   % simulation results: [time,data]
     return_clock        % total real-time for simulation
+    return_conv         % convergence data
 end
 
     % Begin timer
@@ -39,6 +41,7 @@ end
     t_final = options.EndTime;
     ud = options.Update;
     tol = options.Tolerance;
+    trak = options.Track;
 
     %****************************
     % Change coordinate System
@@ -102,11 +105,12 @@ end
     collect = options.Collect;
     if collect
         time = zeros([1,1000]);            % time vector (dynamic)
-        data = zeros([1000,length(ic)]);    % state vector (dynamic)
+        data = zeros([1000,length(ic)]);   % state vector (dynamic)
     else
         time = zeros(1);
         data = zeros([1,length(ic)]);
     end
+    conv_data = zeros(size(time));
 
     % Assign first time and state
     kk = 1;                            % revolution counter
@@ -241,11 +245,18 @@ end
                 if kk == length(time)
                     time(end + 1000) = 0;
                     data(end + 1000,:) = 0;
+                    conv_data(end + 1000) = 0;
                 end
             end
 
+            % Compute difference between points of Poincare map
+            change = metric_wasserstein1(d,prior);
+            if trak
+                conv_data(kk) = change;
+            end
+
             % Check for convergence
-            converged = metric_wasserstein1(d,prior) < tol;
+            converged = change < tol;
 
             % Reset revolution counter
             new_rev = false;
@@ -278,9 +289,11 @@ end
         return_time = time(1:kk);
         data = data(1:kk,:);
         return_data = data;
+        return_conv = conv_data(2:kk);
     else
         return_time = time;
         return_data = data;
+        return_conv = conv_data(2:end);
     end
     return_clock = end_time;
 

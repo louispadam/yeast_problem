@@ -2,7 +2,7 @@ function [return_time, return_data, return_clock]=cont_sudospec_etd_feuler(initi
 %CONT_SUDOSPEC_ETD_FEULER simulates the yeast Vlasov-McKean PDE using 
 %pseudospectral methods with exponentil time differencing.
 %
-%last updated 07/30/25 by Adam Petrucci
+%last updated 07/30/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct   % parameters for simulation
@@ -12,8 +12,8 @@ arguments (Input)
     options.EndTime = 40     % maximum simulation time
     options.Update = true    % whether or not to regularly print updates
                              % Default: Deliver updates
-    options.M_SZ = 2^15/length(initial) % bound on size of storage object
-                                        % so Matlab doesn't complain
+    options.M_SZ = 2^15      % bound on size of storage object
+                             % so Matlab doesn't complain
 end
 arguments (Output)
     return_time (1,:)   % discretized time axis of simulation

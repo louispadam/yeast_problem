@@ -2,7 +2,7 @@
 *main*
 *.asv
 *private*
-*experiment*
+*experiments*
 images
 *.png
 *.mat
