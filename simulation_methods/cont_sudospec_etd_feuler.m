@@ -1,4 +1,5 @@
-function [return_time, return_data, return_clock]=cont_sudospec_etd_feuler(initial,params,options)
+function [return_time, return_data, return_clock] = ....
+         cont_sudospec_etd_feuler(initial, params, options)
 %CONT_SUDOSPEC_ETD_FEULER simulates the yeast Vlasov-McKean PDE using 
 %pseudospectral methods with exponentil time differencing.
 %
@@ -32,7 +33,6 @@ end
     %****************************
     % System Parameters
     %****************************
-
     L=2*pi;
     a0=params.s1*2*L-L;
     a1=params.s2*2*L-L;

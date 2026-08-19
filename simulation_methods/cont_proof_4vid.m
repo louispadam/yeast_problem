@@ -1,12 +1,12 @@
 function [return_time, return_data, return_clock] = ...
-         cont_proof(initial, params, options)
+         cont_proof_4vid(initial, params, options)
 %CONT_PROOF simulates the yeast MF using a scheme inspired from our
 %proof of the mean-field limit. It is built on the method of
 %characteristics and becomes something of an inverse problem. An effort
 %was made to mirror structure of the analogous
 %NODE scheme.
 %
-%last updated 08/18/26 by Adam Petrucci
+%last updated 08/19/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct   % parameters for simulation
@@ -30,6 +30,7 @@ end
     % Collect Inputs
     %****************************
 
+    % Initial data
     ic = initial;
 
     % Extract spatial parameters
@@ -65,20 +66,16 @@ end
     % dt < |delta| and dt corresponds to an integral number of spatial
     % steps (when running at unit speed). Recall s1_tilde = 1.
     opt_ts = floor((1-r2_tilde)/dx) * dx;
-    if dt > opt_ts
+    if dt > opt_ts         % Requested timestep too long
         dt = opt_ts;
         fprintf(['Given timestep too big; ', ...
                  'Using default of %.6f instead.\n'],dt);
     end
-    if ~(mod(dt,dx) == 0)
+    if ~(mod(dt,dx) == 0)  % Requested timestep doesn't fit spatial grid
         dt = floor(dt/dx) * dx;
         fprintf(['Timestep adjusted for spatial alignment; ', ...
                  'Using %.6f instead.\n'],dt);
     end
-
-    x_steps = floor(dt/dx);  % spatial steps / time step (unit speed)
-
-    tt = 0; % current time
 
     % Define stepping for iteration
     steps = round(t_final/dt + 1);
@@ -93,7 +90,13 @@ end
         keep = steps/msz;
     end
 
-    % Define time and space vectors to store
+    % Compute spatial steps / time step (at unit speed)
+    x_steps = floor(dt/dx);
+
+    % Current time
+    tt = 0;
+
+    % Define time and space vectors for storage
     time = zeros([1,sz]);
     time(1) = tt;
     data = zeros([sz,length(ic)]);
@@ -112,8 +115,7 @@ end
     %****************************
     % Construct Stationary Objects
     %****************************
-    % To save time, we compute vectors corresponding to S and R outside the
-    % for loop
+    % To save time, some objects may be computed outside the iterative loop
 
     % Find indices related to S
     s_set = find(x < s2_tilde);            % [0,s2)  indices
@@ -122,16 +124,26 @@ end
     r_all = find(x < r2_tilde + dt & x > r1_tilde);  % (r1,r2+dt)  indices
     r_after = find(x < r2_tilde + dt & x > r2_tilde);% (r2,r2+dt)  indices
     r_set = setdiff(r_all,r_after);                  % (r1,r2] indices
-    big_R = max(r_set);
-    lil_R = min(r_set);
-
-    ind = length(s_set);
+    big_R = max(r_set);      %  last index of R
+    lil_R = min(r_set);      % first index of R
 
     % Correction matrix for quadrature over S. Once S(t0) is known, each
     % mini-step effectively translates the S region, so we remove conc at
     % ends and add conc at beginning to maintian trapezoidal integration.
+    ind = length(s_set);
     corr = [-1,0,ind-1,ind] - (0:(x_steps-1)).';
     corr = mod(corr,length(x)) + 1;
+
+    % Compute fixed quantities. Out of context, these do not all make very
+    % much sense, so Ctr-F to find them in the code
+    times_S = 0:dx:dt;                         % S-events
+    exit_times = dt - (x(r_after) - r2_tilde); % time to exit R
+    k_inds = floor(exit_times/dx) + 1;         % indices of to exits
+    k = k_inds - 1;                            % for interpolation
+    k_inds = min(k_inds, length(time_S) - 1);  % for interpolation
+    exit_diff = exit_times - times_S(k_inds);  % for interpolation
+    base = min(x(r_all), r2_tilde);            % optimal positioning wrt R
+    exit_interp = (exit_times - k*dx)/dx;      % for interpolation
 
     %****************************
     % Iterate!
@@ -150,57 +162,42 @@ end
 
         % compute speeds and displacements
         speeds = 1 - params.alph*Ns(1:end-1);
-        times_S = 0:dx:dt;  % S-event times
         H = [0, cumsum(speeds .* diff(times_S))];
 
-        % these objects pertain to R-events
-        entry_times = zeros(size(r_all));
-        exit_times = dt*ones(size(r_all));
-        z0 = zeros(size(r_all));   % 'starting' locations
+        % compute displacement upon particle exit
+        Hcorr = H(end)*ones(size(r_all));
+        Hcorr(r_after - min(r_all) + 1) = H(k) + ...
+                                          speeds(k_inds) .* exit_diff;
 
-        % particles after R exit predictably (speed 1)
-        % other particles can use exit_time = dt
-        exit_times(r_after - min(r_all) + 1) = dt - ...
-                                               (x(r_after) - r2_tilde);
-        
-        % determine displacement-function at time of exit to correct actual
-        % displacement later
-        Hcorr = zeros(size(r_all));
-        k = length(times_S);
-        for i = 1:length(r_all)
-            while k > 1 && times_S(k-1) >= exit_times(i)
-                k = k - 1;
-            end
-            Hcorr(i) = H(k-1) + speeds(k-1)*(exit_times(i) ...
-                       - times_S(k-1)); % H at exit time
-        end
-
-        % correct exit times for later. those that don't exit (ie are in R)
-        % get NaN
-        exit_times(r_set - min(r_all) + 1) = NaN;
-        exit_times = exit_times(~isnan(exit_times));
-
-        % determine where to compute displacement from (ic or r1) and set
-        % target displacement accordingly with correction for exit time
-        base = min(x(r_all), r2_tilde);
+        % set target displacement according to correction for exit time
         targets = Hcorr - (base - r1_tilde);
 
+        % I suspect I could accomplish the iteration without having to use
+        % a copy of the current density, but doing so in an optimal fashion
+        % may require some investment, so I will leave it for now.
         d_new = circshift(d,x_steps-1);
 
-        k = length(times_S);
-        j = 1;
+        % Reset storage vector for particle starting-points
+        z0 = zeros(size(r_all));   % 'starting' locations
+
+        k = length(times_S); % counter for H
+        j = 1;               % counter for z0
+        Ns_enter = NaN(size(r_all)); % S-pop at time of entry
         for i = 1:length(r_all)
+
             % Determine time of particle entry in R
             while k > 1 && H(k-1) >= targets(i)
                 k = k - 1;
             end
             if k == 1 % particle didn't enter R in this step
                 z0(i) = base(i) - Hcorr(i);
-                entry_times(i) = NaN;
             else      % particle entered R in this step
-                entry_times(i) = times_S(k-1) + ...
-                                 (targets(i)-H(k-1))/speeds(k-1);
-                z0(i) = r1_tilde - entry_times(i);
+                entry_time = times_S(k-1) + ...
+                             (targets(i)-H(k-1))/speeds(k-1);
+                z0(i) = r1_tilde - entry_time;
+                exit_interp = (entry_time-times_S(k-1)) / dx;
+                Ns_enter(i) = (1-exit_interp) * Ns(k-1) + ...
+                                  exit_interp * Ns(k);
             end
 
             % Solve inverse problem for starting position with linear
@@ -209,42 +206,37 @@ end
             while x(j+1) < zi
                 j = j + 1;
             end
-            if j == big_R
+            if j == big_R          % particle is near r2 so interp breaks
                 if zi > r2_tilde
                     d_new(r_all(i)) = d(j+1);
                 else
                     d_new(r_all(i)) = d(j);
                 end
-            elseif j == lil_R - 1
+            elseif j == lil_R - 1  % particle is near r1 so interp breaks
                 if zi > r1_tilde
                     d_new(r_all(i)) = d(j+1);
                 else
                     d_new(r_all(i)) = d(j);
                 end
-            else
+            else                   % away from boundary, interpolate
                 d_new(r_all(i)) = d(j) + (d(j+1)-d(j))*(zi-x(j))/dx;
             end
         end
 
-        % save those that entered
-        that_enter = r_all(~isnan(entry_times));  % indices
+        % save indices of those that entered
+        that_enter = r_all(~isnan(Ns_enter));
+        Ns_enter = r_all(~isnan(Ns_enter));
 
-        % correct entry times for later
-        entry_times = entry_times(~isnan(entry_times));
-
-        %[~,inds_exit] = min(abs(exit_times - times.'));
-        Ns_exit = interp1(times_S,Ns,exit_times,'linear');
+        % Apply characteristic jumps
+        Ns_exit = (1-exit_interp) .* Ns(k) + ...
+                      exit_interp .* Ns(k+1); % S-pop at time of exit
         d_new(r_after)    = d_new(r_after) .* ...
-                             exp(-params.alph * Ns_exit);
-
-        %[~,inds_enter] = min(abs(entry_times - times.'));
-        Ns_enter = interp1(times_S,Ns,entry_times,'linear');
+                             exp(-params.alph * Ns_exit); % jump upon entry
         d_new(that_enter) = d_new(that_enter) .* ...
-                             exp(params.alph * Ns_enter);
+                             exp(params.alph * Ns_enter); % jump upon exit
         
+        % Update time and state
         d = d_new;
-
-        % Update current time
         tt = tt + dt;
 
         % Store result at previously calculated frequency

@@ -47,6 +47,8 @@ end
     r1_tilde = mod(params.r1 - params.r2,1);
     s1_tilde = mod(params.s1 - params.r2,1);
     s2_tilde = mod(params.s2 - params.r2,1);
+
+    % Shift initial conditions according to change in coordinates
     ic = mod(ic-params.r2,1);
     N = length(ic); % number of particles
 
