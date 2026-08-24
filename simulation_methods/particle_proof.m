@@ -1,5 +1,5 @@
 function [return_time, return_data, return_clock, return_conv] = ....
-        particle_proof(initial, params, options)
+         particle_proof(initial, params, options)
 %PARTICLE_PROOF simulates the yeast NODE using a scheme inspired from our
 %proof of the mean-field limit. It proceeds until convergence of a Poincare
 %map defined by some reference particle.
@@ -302,7 +302,7 @@ end
     if ud
         fprintf('Completed Simulation in %f seconds ',end_time);
         if tt >= t_final
-            fprintf('hitting end time wall');
+            fprintf('hitting end time wall\n');
         else
             fprintf('with convergence\n');
         end

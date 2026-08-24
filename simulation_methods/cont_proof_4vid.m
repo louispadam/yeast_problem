@@ -1,12 +1,13 @@
 function [return_time, return_data, return_clock] = ...
          cont_proof_4vid(initial, params, options)
-%CONT_PROOF simulates the yeast MF using a scheme inspired from our
+%CONT_PROOF_4vid simulates the yeast MF using a scheme inspired from our
 %proof of the mean-field limit. It is built on the method of
 %characteristics and becomes something of an inverse problem. An effort
-%was made to mirror structure of the analogous
-%NODE scheme.
+%was made to mirror structure of the analogous NODE scheme. This function
+%method differs from cont_proof in that it takes sub-optimal timesteps for
+%the purposes of generating videos.
 %
-%last updated 08/19/26 by Adam Petrucci
+%last updated 08/21/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct   % parameters for simulation
@@ -52,7 +53,9 @@ end
     r2_tilde = mod(params.r2 - params.s1,1);
     s2_tilde = mod(params.s2 - params.s1,1);
 
-    % Shift initial conditions according to change in coordinates
+    % Shift initial conditions according to change in coordinates.
+    % Technically, this may induce some error because s1 may not align with
+    % the grid.
     [~, shift_ind] = min(abs(x-params.s1));
     d = circshift(ic,-(shift_ind-1));
 
@@ -136,14 +139,12 @@ end
 
     % Compute fixed quantities. Out of context, these do not all make very
     % much sense, so Ctr-F to find them in the code
-    times_S = 0:dx:dt;                         % S-events
-    exit_times = dt - (x(r_after) - r2_tilde); % time to exit R
-    k_inds = floor(exit_times/dx) + 1;         % indices of to exits
-    k = k_inds - 1;                            % for interpolation
-    k_inds = min(k_inds, length(time_S) - 1);  % for interpolation
-    exit_diff = exit_times - times_S(k_inds);  % for interpolation
-    base = min(x(r_all), r2_tilde);            % optimal positioning wrt R
-    exit_interp = (exit_times - k*dx)/dx;      % for interpolation
+    times_S = 0:dx:dt;                               % S-events
+    exit_times = dt - (x(r_after) - r2_tilde);       % time to exit R
+    inds_exits = floor(exit_times/dx) + 1;           % inds of the exits
+    exit_diff = exit_times - times_S(inds_exits);    % for interpolation
+    base = min(x(r_all), r2_tilde);                  % positioning wrt R
+    exit_interp = (exit_times - (inds_exits - 1)*dx)/dx; % for interp
 
     %****************************
     % Iterate!
@@ -161,13 +162,17 @@ end
         Ns = N0 + [0,cumsum(0.5*sum([1,1,-1,-1].*d(corr),2)).']*dx;
 
         % compute speeds and displacements
-        speeds = 1 - params.alph*Ns(1:end-1);
-        H = [0, cumsum(speeds .* diff(times_S))];
+        speeds = 1 - params.alph*Ns;
+        %H = [0, cumsum(speeds .* diff(times_S))];
+        H = [0, cumsum(0.5*(speeds(1:end-1) + speeds(2:end)) ...
+                            .* diff(times_S))];
 
         % compute displacement upon particle exit
         Hcorr = H(end)*ones(size(r_all));
-        Hcorr(r_after - min(r_all) + 1) = H(k) + ...
-                                          speeds(k_inds) .* exit_diff;
+        Hcorr(r_after - min(r_all) + 1) = ...
+            H(inds_exits) + speeds(inds_exits) .* exit_diff + ...
+            0.5*(speeds(inds_exits+1) - speeds(inds_exits))/dx .* ...
+            exit_diff.^2;
 
         % set target displacement according to correction for exit time
         targets = Hcorr - (base - r1_tilde);
@@ -175,7 +180,7 @@ end
         % I suspect I could accomplish the iteration without having to use
         % a copy of the current density, but doing so in an optimal fashion
         % may require some investment, so I will leave it for now.
-        d_new = circshift(d,x_steps-1);
+        d_new = circshift(d,x_steps);
 
         % Reset storage vector for particle starting-points
         z0 = zeros(size(r_all));   % 'starting' locations
@@ -192,12 +197,14 @@ end
             if k == 1 % particle didn't enter R in this step
                 z0(i) = base(i) - Hcorr(i);
             else      % particle entered R in this step
-                entry_time = times_S(k-1) + ...
-                             (targets(i)-H(k-1))/speeds(k-1);
+                disp_diff = targets(i) - H(k-1);
+                entry_time = times_S(k-1) + 2*disp_diff/(speeds(k-1) + ...
+                             sqrt(speeds(k-1)^2 + ...
+                             2*(speeds(k)-speeds(k-1))/dx*disp_diff));
                 z0(i) = r1_tilde - entry_time;
-                exit_interp = (entry_time-times_S(k-1)) / dx;
-                Ns_enter(i) = (1-exit_interp) * Ns(k-1) + ...
-                                  exit_interp * Ns(k);
+                entry_interp = (entry_time-times_S(k-1)) / dx;
+                Ns_enter(i) = (1-entry_interp) * Ns(k-1) + ...
+                                  entry_interp * Ns(k);
             end
 
             % Solve inverse problem for starting position with linear
@@ -225,11 +232,11 @@ end
 
         % save indices of those that entered
         that_enter = r_all(~isnan(Ns_enter));
-        Ns_enter = r_all(~isnan(Ns_enter));
+        Ns_enter = Ns_enter(~isnan(Ns_enter));
 
         % Apply characteristic jumps
-        Ns_exit = (1-exit_interp) .* Ns(k) + ...
-                      exit_interp .* Ns(k+1); % S-pop at time of exit
+        Ns_exit = (1-exit_interp) .* Ns(inds_exits) + ...
+                      exit_interp .* Ns(inds_exits+1); % S-pop at time of exit
         d_new(r_after)    = d_new(r_after) .* ...
                              exp(-params.alph * Ns_exit); % jump upon entry
         d_new(that_enter) = d_new(that_enter) .* ...
