@@ -1,4 +1,5 @@
-function [return_time, return_data, return_clock, return_conv] = ...
+function [return_time, return_data, return_clock, return_conv, ...
+          return_end] = ...
          cont_proof(initial, params, options)
 %CONT_PROOF simulates the yeast MF using a scheme inspired from our
 %proof of the mean-field limit. It is built on the method of
@@ -6,7 +7,7 @@ function [return_time, return_data, return_clock, return_conv] = ...
 %was made to mirror structure of the analogous
 %NODE scheme.
 %
-%last updated 08/21/26 by Adam Petrucci
+%last updated 08/25/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct       % parameters for simulation
@@ -30,6 +31,7 @@ arguments (Output)
     return_data (:,:)   % simulation results: [time,data]
     return_clock        % total real-time for simulation
     return_conv         % convergence data
+    return_end          % end by convergence or walltime
 end
 
     %****************************
@@ -121,8 +123,8 @@ end
     % Correction matrix for quadrature over S. Once S(t0) is known, each
     % mini-step effectively translates the S region, so we remove conc at
     % ends and add conc at beginning to maintian trapezoidal integration.
-    ind = length(s_set);
-    fxd_corr = [-1,0,ind-1,ind] - (0:(fxd_x_steps-1)).';
+    ind_s2 = length(s_set);
+    fxd_corr = [-1,0,ind_s2-1,ind_s2] - (0:(fxd_x_steps-1)).';
     fxd_corr = mod(fxd_corr,length(x)) + 1;
 
     % Compute fixed quantities. Out of context, these do not all make very
@@ -176,7 +178,7 @@ end
             
             r_all = find(x < r2_tilde + dt & x > r1_tilde);  % (r1,r2+dt)  inds
             r_after = find(x < r2_tilde + dt & x > r2_tilde);% (r2,r2+dt)  inds
-            corr = [-1,0,ind-1,ind] - (0:(x_steps-1)).';
+            corr = [-1,0,ind_s2-1,ind_s2] - (0:(x_steps-1)).';
             corr = mod(corr,length(x)) + 1;
             times_S = 0:dx:dt;                               % S-events
             exit_times = dt - (x(r_after) - r2_tilde);       % time to exit R
@@ -190,10 +192,6 @@ end
         % compute signal during timestep
         N0 = trapz(d(s_set))*dx;
         Ns = N0 + [0,cumsum(0.5*sum([1,1,-1,-1].*d(corr),2)).']*dx;
-
-        if any(Ns < 0)
-            disp('FLAG')
-        end
 
         % compute speeds and displacements
         speeds = 1 - params.alph*Ns;
@@ -226,7 +224,6 @@ end
                 phantom = r2_tilde + dt - phantom_exit_time;
             end
         end
-        fprintf('phantom at %.4f and dt is %.4f\n',phantom,dt)
 
         % compute displacement upon particle exit
         Hcorr = H(end)*ones(size(r_all));
@@ -247,7 +244,7 @@ end
         z0 = zeros(size(r_all));   % 'starting' locations
 
         k = length(times_S); % counter for H
-        j = 1;               % counter for z0
+        j = 1;               % counter for index of z0
         Ns_enter = NaN(size(r_all)); % S-pop at time of entry
         for i = 1:length(r_all)
 
@@ -255,14 +252,14 @@ end
             while k > 1 && H(k-1) >= targets(i)
                 k = k - 1;
             end
-            if k == 1 % particle didn't enter R in this step
+            if k == 1 % particle started in R in this step
                 z0(i) = base(i) - Hcorr(i);
             else      % particle entered R in this step
                 disp_diff = targets(i) - H(k-1);
                 entry_time = times_S(k-1) + 2*disp_diff/(speeds(k-1) + ...
                              sqrt(speeds(k-1)^2 + ...
                              2*(speeds(k)-speeds(k-1))/dx*disp_diff));
-                z0(i) = r1_tilde - entry_time;
+                z0(i) = mod(r1_tilde - entry_time,1);
                 entry_interp = (entry_time-times_S(k-1)) / dx;
                 Ns_enter(i) = (1-entry_interp) * Ns(k-1) + ...
                                   entry_interp * Ns(k);
@@ -271,7 +268,12 @@ end
             % Solve inverse problem for starting position with linear
             % interpolation.
             zi = z0(i);
-            while x(j+1) < zi
+            % If r1_tilde < dt then initial points will wrap around, and j
+            % must be reset
+            if x(j) > zi
+                j = 1;
+            end
+            while j < length(x) & x(j+1) < zi
                 j = j + 1;
             end
             if j == big_R          % particle is near r2 so interp breaks
@@ -287,7 +289,11 @@ end
                     d_new(r_all(i)) = d(j);
                 end
             else                   % away from boundary, interpolate
-                d_new(r_all(i)) = d(j) + (d(j+1)-d(j))*(zi-x(j))/dx;
+                if j == length(x)
+                    d_new(r_all(i)) = d(j) + (d(1)-d(j))*(zi-x(j))/dx;
+                else
+                    d_new(r_all(i)) = d(j) + (d(j+1)-d(j))*(zi-x(j))/dx;
+                end
             end
         end
 
@@ -340,7 +346,7 @@ end
 
             % Give progress update (if desired).
             if ud && (mod(rev_c,100) == 0)
-                fprintf('Reached revolution %d at time %.2f\n',rev_c,tt);
+                fprintf('Reached revolution %d\n',rev_c);
             end
 
         end % of revolution block
@@ -377,6 +383,12 @@ end
         else
             fprintf('with convergence\n');
         end
+    end
+
+    if tt >= t_final
+        return_end = 0;
+    else
+        return_end = 1;
     end
 
 end

@@ -163,7 +163,6 @@ end
 
         % compute speeds and displacements
         speeds = 1 - params.alph*Ns;
-        %H = [0, cumsum(speeds .* diff(times_S))];
         H = [0, cumsum(0.5*(speeds(1:end-1) + speeds(2:end)) ...
                             .* diff(times_S))];
 
@@ -186,7 +185,7 @@ end
         z0 = zeros(size(r_all));   % 'starting' locations
 
         k = length(times_S); % counter for H
-        j = 1;               % counter for z0
+        j = 1;               % counter for index of z0
         Ns_enter = NaN(size(r_all)); % S-pop at time of entry
         for i = 1:length(r_all)
 
@@ -194,14 +193,14 @@ end
             while k > 1 && H(k-1) >= targets(i)
                 k = k - 1;
             end
-            if k == 1 % particle didn't enter R in this step
+            if k == 1 % particle started in R in this step
                 z0(i) = base(i) - Hcorr(i);
             else      % particle entered R in this step
                 disp_diff = targets(i) - H(k-1);
                 entry_time = times_S(k-1) + 2*disp_diff/(speeds(k-1) + ...
                              sqrt(speeds(k-1)^2 + ...
                              2*(speeds(k)-speeds(k-1))/dx*disp_diff));
-                z0(i) = r1_tilde - entry_time;
+                z0(i) = mod(r1_tilde - entry_time,1);
                 entry_interp = (entry_time-times_S(k-1)) / dx;
                 Ns_enter(i) = (1-entry_interp) * Ns(k-1) + ...
                                   entry_interp * Ns(k);
@@ -210,8 +209,11 @@ end
             % Solve inverse problem for starting position with linear
             % interpolation.
             zi = z0(i);
-            while x(j+1) < zi
-                j = j + 1;
+            if x(j) > zi
+                j = 1;
+            end
+            while j < length(x) & x(j+1) < zi
+                j = j+1;
             end
             if j == big_R          % particle is near r2 so interp breaks
                 if zi > r2_tilde
@@ -226,7 +228,11 @@ end
                     d_new(r_all(i)) = d(j);
                 end
             else                   % away from boundary, interpolate
-                d_new(r_all(i)) = d(j) + (d(j+1)-d(j))*(zi-x(j))/dx;
+                if j == length(x)
+                    d_new(r_all(i)) = d(j) + (d(1)-d(j))*(zi-x(j))/dx;
+                else
+                    d_new(r_all(i)) = d(j) + (d(j+1)-d(j))*(zi-x(j))/dx;
+                end
             end
         end
 

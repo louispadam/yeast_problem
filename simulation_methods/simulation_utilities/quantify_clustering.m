@@ -1,10 +1,16 @@
 function return_data = quantify_clustering(state,options)
-arguments (Input)
-    state
+%QUANTIFY_CLUSTERING effectively computes magnitude of the first few
+%Fourier modes of an empirical measure. When the data is actually
+%continuous, it treats it as equally-spaced point-masses. This is intended
+%to be used as a proxy for cluster detection.
+%
+%last updated 08/25/26 by Adam Petrucci
+arguments (Input) 
+    state                     % state vector on which to detect clustering
 end
 arguments (Input)
-    options.Modes = 5
-    options.Discrete = true
+    options.Modes = 5         % modes to measure
+    options.Discrete = true   % data is either discrete (particle) or continuous
 end
 
     Modes = options.Modes;
