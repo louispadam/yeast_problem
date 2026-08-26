@@ -1,12 +1,17 @@
-# These files are for data analysis, collection, and storage.
+# This is the primary file for code development and data analysis.
+# I hope to avoid merge conflicts by leaving each machine its own main file.
+# (this is just an alternative to branches since I'm the only developer)
 *main*
+
+# Ignore private data files. These are often temporary or for testing purposes.
+data_private/
+
+# Simulation videos are automatically generated with the following title.
+# If meant to be shared, they will be renamed.
+output.mp4
+
+# Temporary files when running scripts
 *.asv
-*private*
-*experiments*
-images
-*.png
-*.mat
-*.mp4
 
 
 # The following are old files whose functionality has been adapted into
