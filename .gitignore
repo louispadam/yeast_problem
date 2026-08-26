@@ -4,7 +4,9 @@
 *main*
 
 # Ignore private data files. These are often temporary or for testing purposes.
-data_private/
+# I will be using private data on all machines, so made it a general part of project.
+data_private/*
+!data_private/.gitkeep
 
 # Simulation videos are automatically generated with the following title.
 # If meant to be shared, they will be renamed.
