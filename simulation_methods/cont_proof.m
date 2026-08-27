@@ -153,6 +153,8 @@ end
 
     while ~converged && (tt < t_final)
 
+        % If just finished a new revolution or started the simulation, set
+        % all variables according to optimal timestep
         if new_rev || rev_c == 1
 
             new_rev = false;
@@ -170,6 +172,9 @@ end
 
         end
 
+        % If optimal timestep would push phantom particle past its
+        % reference point (indicating a new revolution) set all variables
+        % according to timestep that lands revolution
         if phantom + dt > 1
 
             new_rev = true;
@@ -198,6 +203,10 @@ end
         H = [0, cumsum(0.5*(speeds(1:end-1) + speeds(2:end)) ...
                             .* diff(times_S))];
 
+        % First case: for new revolution, dt is chosen specifially to place
+        % phantom at starting position.
+        % Second case: phantom is in regime of unit speed
+        % Third case: phantom particle interacts with R
         if new_rev
             phantom = 0;
         elseif phantom < r1_tilde - dt || phantom > r2_tilde
@@ -211,16 +220,19 @@ end
             phantom_entry_diff = phantom_entry_time - times_S(phantom_entry_index);
             phantom_Hcorr = H(phantom_entry_index) + ...
                             speeds(phantom_entry_index) .* phantom_entry_diff + ...
-                            0.5*(speeds(phantom_entry_index+1) - speeds(phantom_entry_index))/dx .* phantom_entry_diff.^2;
+                            0.5*(speeds(phantom_entry_index+1) - ...
+                            speeds(phantom_entry_index))/dx .* phantom_entry_diff.^2;
             phantom_target = r2_tilde - phantom_base + phantom_Hcorr;
             phantom_exit_index = find(H <= phantom_target,1,'last');
             if phantom_exit_index == length(H)
                 phantom = phantom_base + H(end) - phantom_Hcorr;
             else
                 phantom_exit_diff = phantom_target - H(phantom_exit_index);
-                phantom_exit_time = times_S(phantom_exit_index-1) + 2*phantom_exit_diff/(speeds(phantom_exit_index-1) + ...
-                                    sqrt(speeds(phantom_exit_index-1)^2 + ...
-                                    2*phantom_exit_diff*(speeds(phantom_exit_index)-speeds(phantom_exit_index-1))/dx));
+                phantom_exit_time = times_S(phantom_exit_index) + ...
+                                    2*phantom_exit_diff/(speeds(phantom_exit_index) + ...
+                                    sqrt(speeds(phantom_exit_index)^2 + ...
+                                    2*phantom_exit_diff*(speeds(phantom_exit_index+1)- ...
+                                                         speeds(phantom_exit_index))/dx));
                 phantom = r2_tilde + dt - phantom_exit_time;
             end
         end

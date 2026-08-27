@@ -1,6 +1,6 @@
 # This is the primary file for code development and data analysis.
 # I hope to avoid merge conflicts by leaving each machine its own main file.
-# (this is just an alternative to branches since I'm the only developer)
+# (this is effectively an alternative to branches since I'm the only developer)
 *main*
 
 # Ignore private data files. These are often temporary or for testing purposes.
@@ -12,9 +12,11 @@ data_private/*
 # If meant to be shared, they will be renamed.
 output.mp4
 
+# Mac OS X temporary files
+*DS_Store
+
 # Temporary files when running scripts
 *.asv
-
 
 # The following are old files whose functionality has been adapted into
 # others. I am leaving them on my local machine for reference, but they
