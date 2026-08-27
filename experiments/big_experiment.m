@@ -13,7 +13,7 @@ arguments (Input)
     options.Max_Simulation_Time = 1000  % maximum simulation time
     options.N = [1000, 2000]            % number of particles
     options.Save_Data = "N"             % title to use if saving data
-    options.Trials                      % NODE runs / MF runs
+    options.Trials = 10                 % NODE runs / MF runs
 
     % For the following, L2 = s2 - s1, L3 = r1 - s2, and L4 = r2 - r1.
     % *_start is the value at which the parameter should start, and
@@ -48,6 +48,22 @@ end
     L3_hop = options.L3_hop;
     L4_start = options.L3_start;
     L4_hop = options.L4_hop;
+
+    %****************************
+    % Prepare Error Collection
+    %****************************
+
+    error_data_mf = struct('parameters', {}, ...
+                           'message', {}, ...
+                           'identifier', {}, ...
+                           'stack', {}, ...
+                           'report', {});
+
+    error_data_node = struct('parameters', {}, ...
+                             'message', {}, ...
+                             'identifier', {}, ...
+                             'stack', {}, ...
+                             'report', {});
 
     %****************************
     % Run Simulations
@@ -85,35 +101,62 @@ end
                                                   's2',parameters.s2,...
                                                   'r1',parameters.r1,...
                                                   'r2',parameters.r2);
-                exp_colec{l2}{l3}{l4}{2} = cell([1,4]);
+                exp_colec{l2}{l3}{l4}{2} = cell([1,5]);
                 exp_colec{l2}{l3}{l4}{3} = cell(size(N));
 
-                % Run mean-field simulation
-                [time_mf, data_mf, ~, ~, end_mf] = ...
-                        cont_proof(ic_c,parameters,...
-                                        "Update",false,...
-                                        "Collect",true, ...
-                                        "Track",false, ...
-                                        "EndTime",max_simulation_time);
+                % If simulation returns error, save parameters for
+                % later investigation without terminating
+                % experiment
+                try
 
-                % Detect clusters of mean-field simulation
-                clusters_mf = track_clusters(time_mf,data_mf,...
-                                                 "Modes",modes,...
-                                                 "Discrete",false);
+                    % Run mean-field simulation
+                    [time_mf, data_mf, ~, ~, end_mf] = ...
+                            cont_proof(ic_c,parameters,...
+                                            "Update",false,...
+                                            "Collect",true, ...
+                                            "Track",false, ...
+                                            "EndTime",max_simulation_time);
 
-                % Store final time and state
-                exp_colec{l2}{l3}{l4}{2}{1} = time_mf(end);
-                exp_colec{l2}{l3}{l4}{2}{2} = squeeze(data_mf(end,:));
+                    % Detect clusters of mean-field simulation
+                    clusters_mf = track_clusters(time_mf,data_mf,...
+                        "Modes",modes,...
+                        "Discrete",false);
 
-                % If simulation converged, store cluster data, otherwise
-                % leave flags
-                if end_mf
-                    [exp_colec{l2}{l3}{l4}{2}{3},exp_colec{l2}{l3}{l4}{2}{4}] = ...
+                    % Derive cluster data
+                    [trans_mf,stable_mf] = ...
                         analyze_clusters(time_mf,clusters_mf);
-                else
-                    exp_colec{l2}{l3}{l4}{2}{3} = -1;
-                    exp_colec{l2}{l3}{l4}{2}{4} = 0;
+
+                catch ME
+
+                    fprintf("ERROR simulating MF with" + ...
+                            "parameter set:\n" + ...
+                            "[s1, s2, r1, r2] = " + ...
+                            "[0.0, %.2f, %.2f, %.2f]\n",...
+                            parameters.s2,parameters.r1,parameters.r2);
+                    fprintf('%s\n', ME.message);
+
+                    num_errors = numel(error_data_mf) + 1;
+
+                    error_data_mf(num_errors).parameters = parameters;
+                    error_data_mf(num_errors).message = ME.message;
+                    error_data_mf(num_errors).identifier = ME.identifier;
+                    error_data_mf(num_errors).stack = ME.stack;
+                    error_data_mf(num_errors).report = getReport(ME);
+
+                    time_mf = 0;
+                    data_mf = ic_c;
+                    end_mf = 0;
+                    trans_mf = 0;
+                    stable_mf = 0;
+
                 end
+
+                % Store data
+                exp_colec{l2}{l3}{l4}{2}{1} = end_mf;
+                exp_colec{l2}{l3}{l4}{2}{2} = time_mf(end);
+                exp_colec{l2}{l3}{l4}{2}{3} = squeeze(data_mf(end,:));
+                exp_colec{l2}{l3}{l4}{2}{4} = trans_mf;
+                exp_colec{l2}{l3}{l4}{2}{5} = stable_mf;
 
                 for n = 1:length(N)
 
@@ -123,63 +166,94 @@ end
                     for t = 1:trials
 
                         % Set up storage for each NODE trial
-                        exp_colec{l2}{l3}{l4}{3}{n}{t} = cell([1,4]);
+                        exp_colec{l2}{l3}{l4}{3}{n}{t} = cell([1,5]);
 
                         % Sample initial particle data
                         ic_p = sort(p_sampler(N(n)));
 
-                        % Run NODE simulation
-                        [time_node, data_node, ~, ~, end_node] = ...
-                            particle_proof(ic_p,parameters, ...
-                                            "Update",false,...
-                                            "Collect",true,...
-                                            "Track",false,...
-                                            "EndTime",max_simulation_time);
+                        % If simulation returns error, save parameters for
+                        % later investigation without terminating
+                        % experiment
+                        try
 
-                        % Detect clusters of NODE simulation
-                        clusters_node = ...
-                            track_clusters(time_node,data_node,...
-                                           "Modes",modes,...
-                                           "Discrete",true);
+                            % Run NODE simulation
+                            [time_node, data_node, ~, ~, end_node] = ...
+                                particle_proof(ic_p,parameters, ...
+                                                "Update",false,...
+                                                "Collect",true,...
+                                                "Track",false,...
+                                                "EndTime",max_simulation_time);
 
-                        % Store final time and state
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{1} = time_node(end);
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{2} = ...
-                                                 squeeze(data_node(end,:));
+                            % Detect clusters of NODE simulation
+                            clusters_node = ...
+                                track_clusters(time_node,data_node,...
+                                               "Modes",modes,...
+                                               "Discrete",true);
 
-                        % If simulation converged, store cluster data,
-                        % otherwise leave flags
-                        if end_node
-                            [exp_colec{l2}{l3}{l4}{3}{n}{t}{3},...
-                            exp_colec{l2}{l3}{l4}{3}{n}{t}{4}] = ...
+                            % Derive cluster data
+                            [trans_node,stable_node] = ...
                                 analyze_clusters(time_node,clusters_node);
-                        else
-                            exp_colec{l2}{l3}{l4}{3}{n}{t}{3} = -1;
-                            exp_colec{l2}{l3}{l4}{3}{n}{t}{4} = 0;
+
+                        catch ME
+
+                            fprintf("ERROR simulating NODE with" + ...
+                                "parameter set:\n" + ...
+                                "[s1, s2, r1, r2] = " + ...
+                                "[0.0, %.2f, %.2f, %.2f]\n",...
+                                parameters.s2,parameters.r1,parameters.r2);
+                            fprintf('%s\n', ME.message);
+
+                            num_errors = numel(error_data_node) + 1;
+
+                            error_data_node(num_errors).parameters = parameters;
+                            error_data_node(num_errors).message = ME.message;
+                            error_data_node(num_errors).identifier = ME.identifier;
+                            error_data_node(num_errors).stack = ME.stack;
+                            error_data_node(num_errors).report = getReport(ME);
+
+                            time_node = 0;
+                            data_node = ic_p;
+                            end_node = 0;
+                            trans_node = 0;
+                            stable_node = 0;
+
                         end
+
+                        % Store data
+                        exp_colec{l2}{l3}{l4}{3}{n}{t}{1} = end_node;
+                        exp_colec{l2}{l3}{l4}{3}{n}{t}{2} = time_node(end);
+                        exp_colec{l2}{l3}{l4}{3}{n}{t}{3} = ...
+                                                 squeeze(data_node(end,:));
+                        exp_colec{l2}{l3}{l4}{3}{n}{t}{4} = trans_node;
+                        exp_colec{l2}{l3}{l4}{3}{n}{t}{5} = stable_node;
 
                     end % end of NODE trials
 
                 end % for N
 
                 % Deliver progress update once done with a parameter set
+                so_far_time = toc(exp_timer);
                 fprintf("Finished running parameter set:\n" + ...
-                        "[s1, s2, s3, s4] = " + ...
+                        "[s1, s2, r1, r2] = " + ...
                         "[0.0, %.2f, %.2f, %.2f]\n" + ...
-                        "with time %s\n", ...
+                        "with time %02d:%02d:%02d\n", ...
                         parameters.s2,parameters.r1,parameters.r2,...
-                        string(duration(exp_timer, 'Format', 'hh:mm:ss')));
+                        floor(so_far_time/3600),...
+                        floor(mod(so_far_time,3600)/60),...
+                        floor(mod(so_far_time,60)));
+
+                % Save, if requested
+                if ~strcmp(save_data,"N")
+                    save(save_data,"exp_colec");
+                    save("error_mf_" + save_data, "error_data_mf");
+                    save("error_node_" + save_data, "error_data_node");
+                end
 
             end % for L4
 
         end % for L3
 
     end % for L2
-
-    % Save, if requested
-    if ~strcmp(save_data,"N")
-        save(save_data,'exp_colec','-v7.3')
-    end
 
     return_data = exp_colec;
 
