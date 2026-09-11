@@ -1,12 +1,13 @@
-function return_data = big_experiment(parameters,ic_c,p_sampler,options)
+function return_data = big_experiment(parameters,ic_c,p_sampler,parameter_range,options)
 %BIG_EXPERIMENT simulates MF and NODE for various parameter regimes for the
 %purposes of comparison
 %
-%last updated 08/25/26 by Adam Petrucci
+%last updated 09/04/26 by Adam Petrucci
 arguments (Input)
     parameters      % parameter struct (mostly to be overwritten)
     ic_c            % continuous IC (as vector)
     p_sampler       % particle IC (as sampling function)
+    parameter_range
 end
 arguments (Input)
     options.Modes = 7                   % number of modes to monitor
@@ -20,12 +21,12 @@ arguments (Input)
     % *_hop is the frequency for the parameter
     % In words, the experiment will involve all values *_start:*_hop:*_max
     % where *_max is set to ensure delta >= 0.1
-    options.L2_start = 0.1
-    options.L2_hop = 0.1
-    options.L3_start = 0.1   
-    options.L3_hop = 0.1
-    options.L4_start = 0.1
-    options.L4_hop = 0.1
+    %options.L2_start = 0.1
+    %options.L2_hop = 0.1
+    %options.L3_start = 0.1   
+    %options.L3_hop = 0.1
+    %options.L4_start = 0.1
+    %options.L4_hop = 0.1
 end
 arguments (Output)
     return_data    % results of experiment
@@ -37,21 +38,25 @@ end
 
     save_data = options.Save_Data;
 
+    pr = parameter_range; % pr for 'parameter range'
+
     modes = options.Modes;
     max_simulation_time = options.Max_Simulation_Time;
     trials = options.Trials;
 
     N = options.N;
-    L2_start = options.L2_start;
-    L2_hop = options.L2_hop;
-    L3_start = options.L3_start;
-    L3_hop = options.L3_hop;
-    L4_start = options.L3_start;
-    L4_hop = options.L4_hop;
+    %L2_start = options.L2_start;
+    %L2_hop = options.L2_hop;
+    %L3_start = options.L3_start;
+    %L3_hop = options.L3_hop;
+    %L4_start = options.L3_start;
+    %L4_hop = options.L4_hop;
 
     %****************************
-    % Prepare Error Collection
+    % Prepare objects for Data Collection
     %****************************
+
+    exp_colec = cell([size(pr,1),1]);
 
     error_data_mf = struct('parameters', {}, ...
                            'message', {}, ...
@@ -72,37 +77,44 @@ end
     % start timer
     exp_timer = tic;
 
-    % Update: s1, range of s2-s1, and first storage layer
-    parameters.s1 = 0.0;
-    L2 = L2_start:L2_hop:0.7;
-    exp_colec = cell(size(L2));
+    for ps = 1:size(pr,1) % ps for 'parameter set'
 
-    for l2 = 1:length(L2)
+        parameters.s1 = pr(ps,1);
+        parameters.s2 = pr(ps,2);
+        parameters.r1 = pr(ps,3);
+        parameters.r2 = pr(ps,4);
+
+    % Update: s1, range of s2-s1, and first storage layer
+    %parameters.s1 = 0.0;
+    %L2 = L2_start:L2_hop:0.7;
+    %exp_colec = cell(size(L2));
+
+    %for l2 = 1:length(L2)
 
         % Update: s2, range of r1-s2, and second storage layer
-        parameters.s2 = L2(l2);
-        L3 = L3_start:L3_hop:(0.8-parameters.s2);
-        exp_colec{l2} = cell(size(L3));
+        %parameters.s2 = L2(l2);
+        %L3 = L3_start:L3_hop:(0.8-parameters.s2);
+        %exp_colec{l2} = cell(size(L3));
 
-        for l3 = 1:length(L3)
+        %for l3 = 1:length(L3)
 
             % Update: s1, range of r2-r1, and third storage layer
-            parameters.r1 = parameters.s2 + L3(l3);
-            L4 = L4_start:L4_hop:(0.9-parameters.r1);
-            exp_colec{l2}{l3} = cell(size(L4));
+            %parameters.r1 = parameters.s2 + L3(l3);
+            %L4 = L4_start:L4_hop:(0.9-parameters.r1);
+            %exp_colec{l2}{l3} = cell(size(L4));
 
-            for l4 = 1:length(L4)
+            %for l4 = 1:length(L4)
 
                 % Update r2, and set storage for parameters, mean-field
                 % data, and NODE data
-                parameters.r2 = parameters.r1 + L4(l4);
-                exp_colec{l2}{l3}{l4} = cell([1,3]);
-                exp_colec{l2}{l3}{l4}{1} = struct('s1',parameters.s1,...
-                                                  's2',parameters.s2,...
-                                                  'r1',parameters.r1,...
-                                                  'r2',parameters.r2);
-                exp_colec{l2}{l3}{l4}{2} = cell([1,5]);
-                exp_colec{l2}{l3}{l4}{3} = cell(size(N));
+                %parameters.r2 = parameters.r1 + L4(l4);
+                %exp_colec{l2}{l3}{l4} = cell([1,3]);
+                %exp_colec{l2}{l3}{l4}{1} = struct('s1',parameters.s1,...
+                %                                  's2',parameters.s2,...
+                %                                  'r1',parameters.r1,...
+                %                                  'r2',parameters.r2);
+                %exp_colec{l2}{l3}{l4}{2} = cell([1,5]);
+                %exp_colec{l2}{l3}{l4}{3} = cell(size(N));
 
                 % If simulation returns error, save parameters for
                 % later investigation without terminating
@@ -151,22 +163,40 @@ end
 
                 end
 
+                exp_colec(ps) = struct( ...
+                               'parameter_set',[parameters.s1,...
+                                                parameters.s2,...
+                                                parameters.r1,...
+                                                parameters.r2],...
+                               'mf_endstate',stable_mf,...
+                               'mf_endtime',time_mf,...
+                               'mf_enddata',data_mf,...
+                               'mf_transtime',trans_mf,...
+                               'mf_clusters',end_mf,...
+                               'node_endstate',zeros([length(N),trials]),...
+                               'node_endtime',zeros([length(N),trials]),...
+                               'node_enddata',cell([length(N),1]),...
+                               'node_transtime',zeros([length(N),trials]),...
+                               'node_clusters',zeros([length(N),trials]));
+
                 % Store data
-                exp_colec{l2}{l3}{l4}{2}{1} = end_mf;
-                exp_colec{l2}{l3}{l4}{2}{2} = time_mf(end);
-                exp_colec{l2}{l3}{l4}{2}{3} = squeeze(data_mf(end,:));
-                exp_colec{l2}{l3}{l4}{2}{4} = trans_mf;
-                exp_colec{l2}{l3}{l4}{2}{5} = stable_mf;
+                %exp_colec{l2}{l3}{l4}{2}{1} = end_mf;
+                %exp_colec{l2}{l3}{l4}{2}{2} = time_mf(end);
+                %exp_colec{l2}{l3}{l4}{2}{3} = squeeze(data_mf(end,:));
+                %exp_colec{l2}{l3}{l4}{2}{4} = trans_mf;
+                %exp_colec{l2}{l3}{l4}{2}{5} = stable_mf;
 
                 for n = 1:length(N)
 
                     % Set up storage for NODE data
-                    exp_colec{l2}{l3}{l4}{3}{n} = cell([1,trials]);
+                    %exp_colec{l2}{l3}{l4}{3}{n} = cell([1,trials]);
+
+                    exp_colec{ps}.endstate{n} = zeros([t,N(n)]);
 
                     for t = 1:trials
 
                         % Set up storage for each NODE trial
-                        exp_colec{l2}{l3}{l4}{3}{n}{t} = cell([1,5]);
+                        %exp_colec{l2}{l3}{l4}{3}{n}{t} = cell([1,5]);
 
                         % Sample initial particle data
                         ic_p = sort(p_sampler(N(n)));
@@ -219,13 +249,19 @@ end
 
                         end
 
+                        exp_colec{ps}.node_endstate(n,t) = end_node;
+                        exp_colec{ps}.node_endtime(n,t) = time_node;
+                        exp_colec{ps}.node_enddata{n}(t,:) = data_node;
+                        exp_colec{ps}.node_trans_node(n,t) = trans_node;
+                        exp_colec{ps}.node_clusters(n,t) = stable_node;
+
                         % Store data
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{1} = end_node;
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{2} = time_node(end);
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{3} = ...
-                                                 squeeze(data_node(end,:));
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{4} = trans_node;
-                        exp_colec{l2}{l3}{l4}{3}{n}{t}{5} = stable_node;
+                        %exp_colec{l2}{l3}{l4}{3}{n}{t}{1} = end_node;
+                        %exp_colec{l2}{l3}{l4}{3}{n}{t}{2} = time_node(end);
+                        %exp_colec{l2}{l3}{l4}{3}{n}{t}{3} = ...
+                        %                         squeeze(data_node(end,:));
+                        %exp_colec{l2}{l3}{l4}{3}{n}{t}{4} = trans_node;
+                        %exp_colec{l2}{l3}{l4}{3}{n}{t}{5} = stable_node;
 
                     end % end of NODE trials
 
@@ -249,11 +285,13 @@ end
                     save("error_node_" + save_data, "error_data_node");
                 end
 
-            end % for L4
+            %end % for L4
 
-        end % for L3
+        %end % for L3
 
-    end % for L2
+    %end % for L2
+
+    end % of experiment for all parameter sets
 
     return_data = exp_colec;
 

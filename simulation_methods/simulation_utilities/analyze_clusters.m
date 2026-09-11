@@ -18,6 +18,9 @@ end
     final_cluster = max_cluster(end);
     transition_index = length(max_cluster) + 1 - ...
             find(flip(max_cluster)~=final_cluster,1,'first');
+    if isempty(transition_index)
+        transition_index = 1;
+    end
     return_time = time_vec(transition_index);
     return_final = final_cluster;
 
