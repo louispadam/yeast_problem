@@ -97,7 +97,7 @@ end
     % Assign first time and state
     rev_c = 1;                            % revolution counter
     time(rev_c) = tt;                     % save first time
-    data(rev_c,:) = d;               % save first state
+    data(rev_c,:) = d;                    % save first state
 
     % State upon previous revolution (for convergence criterion)
     prior = d;
