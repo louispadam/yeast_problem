@@ -5,7 +5,7 @@ function [return_time, return_data, return_clock, return_conv, ...
 %of yeast metabolism. It is built from the proof-scheme for NODE but uses
 %the convergence criterion from the the proof-scheme for MF.
 %
-%last updated 09/08/26 by Adam Petrucci
+%last updated 09/23/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct       % parameters for simulation
@@ -135,6 +135,7 @@ end
         exit_inds = find(exit_events > 0 & exit_events < dt);
         exit_times = exit_events(exit_events > 0 & exit_events < dt);
 
+        % Compute density
         mass_curr = mass(labels);
         density = mass_curr ./ ...
                   [d(2:end)-d(1:end-1), d(1)-d(end)+1];
@@ -142,8 +143,9 @@ end
         mass_ext = [mass_curr(end), mass_curr];
         density_ext = [density(end), density];
 
-        in_ind = find(d_ext <= s1_tilde,1,'last');
-        out_ind = find(d_ext <= s2_tilde,1,'last');
+        % Determine initial population of S
+        in_ind = find(d_ext <= s1_tilde,1,'last');  % last index pre-S
+        out_ind = find(d_ext <= s2_tilde,1,'last'); % last index in S
 
         if in_ind == out_ind
             N0 = density_ext(in_ind) * (s2_tilde - s1_tilde);
@@ -153,79 +155,27 @@ end
                 density_ext(out_ind) * (s2_tilde - d_ext(out_ind));
         end
 
+        % Adjust ordering of events in vector
         enter_times = flip(enter_times);
         enter_inds  = flip(enter_inds);
-
         exit_times = flip(exit_times);
         exit_inds  = flip(exit_inds);
 
+        % Compute change population at each event
         enter_jumps = density(mod(enter_inds-2,N) + 1) - density(enter_inds);
         exit_jumps = density(exit_inds) - density(mod(exit_inds-2,N) + 1);
 
-        n_enter = length(enter_times);
-        n_exit  = length(exit_times);
+        % Combing changes in population into a single, ordered vector
+        [event_times, jumps] = merge_sorted(enter_times,exit_times,...
+                               'AuxFun',build_aux(enter_jumps,exit_jumps));
 
-        event_times = zeros(1,n_enter+n_exit);
-        jumps       = zeros(1,n_enter+n_exit);
-
-        ie = 1;
-        ix = 1;
-        k  = 0;
-
-        % Tolerance only for recognizing numerically identical times
-        %time_tol = 100*eps(max(1,dt));
-
-        while ie <= n_enter || ix <= n_exit
-
-            % Only enter-events remain
-            if ix > n_exit
-                t_event = enter_times(ie);
-                dq = enter_jumps(ie);
-                ie = ie + 1;
-
-            % Only exit-events remain
-            elseif ie > n_enter
-                t_event = exit_times(ix);
-                dq = exit_jumps(ix);
-                ix = ix + 1;
-    
-            % Enter-event occurs first
-            elseif enter_times(ie) < exit_times(ix)%-time_tol
-                t_event = enter_times(ie);
-                dq = enter_jumps(ie);
-                ie = ie + 1;
-
-            % Exit-event occurs first
-            elseif exit_times(ix) < enter_times(ie)%-time_tol
-                t_event = exit_times(ix);
-                dq = exit_jumps(ix);
-                ix = ix + 1;
-
-            % Simultaneous enter and exit event
-            else
-                t_event = 0.5 * (enter_times(ie) + exit_times(ix));
-                dq = enter_jumps(ie) + exit_jumps(ix);
-                ie = ie + 1;
-                ix = ix + 1;
-            end
-
-            k = k + 1;
-            event_times(k) = t_event;
-            jumps(k) = dq;
-
-        end
-
-        event_times = event_times(1:k);
-        jumps       = jumps(1:k);
-
+        % Compute population of S
         in_left  = find(d_ext < s1_tilde,1,'last');
         out_left = find(d_ext < s2_tilde,1,'last');
         flux0 = density_ext(in_left) - density_ext(out_left);
         flux = flux0 + [0, cumsum(jumps)];
         times = [0, event_times, dt];
         Ns = N0 + [0,cumsum(flux .* diff(times))];
-
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         % Compute speed in R after each event
         speeds = 1 - params.alph*Ns;
@@ -234,17 +184,19 @@ end
         times = [0, event_times, dt];
         H = [0, cumsum(0.5 *(speeds(1:end-1) + speeds(2:end)) ...
                           .* diff(times))];
-%-------------------------------------------------------------------------
+
+        % Evolve the phantom particle according to three cases.
         % First case: for new revolution, dt is chosen specifially to place
         % phantom at starting position.
         % Second case: phantom is in regime of unit speed
         % Third case: phantom particle interacts with R
-        %if new_rev
-        %    phantom = 0;
-        %elseif phantom < r1_tilde - dt
         if phantom <= r1_tilde - dt
+
             phantom = phantom + dt;
+
         else
+
+            % Determine interaction of phantom with R
             phantom_entry_time = max(0,r1_tilde - phantom);
             phantom_base = max(r1_tilde, phantom);
             phantom_entry_index = find(times <= phantom_entry_time,1,'last');
@@ -253,11 +205,18 @@ end
                             speeds(phantom_entry_index) .* phantom_entry_diff - ...
                             0.5*params.alph*flux(phantom_entry_index) .* phantom_entry_diff.^2;
             phantom_target = 1 - phantom_base + phantom_Hcorr;
-            if phantom_target > H(end)
+
+            % Check if phantom leaves R
+            if phantom_target > H(end)  % does not leave R
+
                 phantom = phantom_base + H(end) - phantom_Hcorr;
-            else
+
+            else                        % does leave R
+
+                % Since r_2 = 1, this implies a new revolution
                 new_rev = true;
 
+                % Compute exit time of phantom particle
                 phantom_exit_index = find(H <= phantom_target,1,'last');
                 phantom_exit_diff = phantom_target - H(phantom_exit_index);
                 phantom_exit_time = times(phantom_exit_index) + ...
@@ -267,19 +226,18 @@ end
                 dt = phantom_exit_time;
                 phantom = 0;
 
+                % To accomodate the shortened timestep, the functional
+                % vectors are truncated and modified.
+                % The if/else here is just to handle some funky counting.
                 if dt > times(phantom_exit_index)
 
                     tau = dt - times(phantom_exit_index);
-
                     times = [times(1:phantom_exit_index), dt];
-
                     speeds = [speeds(1:phantom_exit_index), ...
                             speeds(phantom_exit_index) - params.alph*flux(phantom_exit_index)*tau];
-
                     H = [H(1:phantom_exit_index), ...
                         H(phantom_exit_index) + speeds(phantom_exit_index)*tau ...
                             - 0.5*params.alph*flux(phantom_exit_index)*tau^2];
-
                     flux = flux(1:phantom_exit_index);
 
                 else
@@ -292,7 +250,6 @@ end
                 end
             end
         end
-%-----------------------------------------------------------------------
 
         % Find particles that interact with R during step
         % In new coords, r2=1 so x<r2 is trivial
@@ -332,7 +289,6 @@ end
             if k == length(H) % particle doesn't leave R in step
                 d(r_ind(i)) = base(i) + H(end) - Hcorr(i);
             else              % particle left R during step
-                %exit_time = (targets(i)-H(k))/(speeds(k)) + times(k);
                 C = targets(i) - H(k);
                 discr = speeds(k)^2 - 2*params.alph*flux(k)*C;
                 exit_time = times(k) + 2*C / (speeds(k) + sqrt(discr));
@@ -405,36 +361,11 @@ end
 
     % If only request final state, store it now
     if ~collect
+
+        % store ending time and data according to original positions
         time(2) = tt;
-        mass_curr = mass(labels);
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-        % Periodic extension of source mesh
-        d_ext = [d(end)-1, d, d(1)+1];
-        mass_ext = [mass_curr(end), mass_curr];
-        cum_mass = [0, cumsum(mass_ext)];
-
-        % Density in each Lagrangian cell
-        density_lag = mass_ext ./ diff(d_ext);
-
-        interp_mass = zeros(size(ic_ext));
-        k = 1;
-        for i = 1:length(ic_ext)
-
-            while k < length(mass_ext) && ic_ext(i) >= d_ext(k+1)
-                k = k + 1;
-            end
-
-            interp_mass(i) = cum_mass(k) ...
-                + density_lag(k) * (ic_ext(i) - d_ext(k));
-        end
-
-        % Mass and average density on each homogeneous cell
-        density_eul = diff(interp_mass) ./ diff(ic_ext);
-        data(2,:) = circshift(density_eul,shift_ind-1);
-                         % store according to original positions
-
-                         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        data(2,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+                              shift_ind-1);
     end
 
     % Stop timer
@@ -464,6 +395,7 @@ end
         end
     end
 
+    % Check if simulation ended due to convergence or walltime
     if tt >= t_final
         return_end = 0;
     else
@@ -477,6 +409,11 @@ end % of main function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function return_data = lagrange_to_euler(lag_coord, eul_coord, mass)
+%LAGRANGE_TO_EULER converts lagrangian coordinates to the original eulerian
+%coordinates in which initial data were given. This is purely for
+%presentation, it does not impact the algorithm.
+%
+%last updated 09/23/26 by Adam Petrucci
 
     % Periodic extension (for easy vectorization)
     d_ext = [lag_coord(end)-1, lag_coord, lag_coord(1)+1];
@@ -501,5 +438,37 @@ function return_data = lagrange_to_euler(lag_coord, eul_coord, mass)
 
     % density on Eulerian mesh
     return_data = diff(interp_mass) ./ diff(ic_ext);
+
+end
+
+function return_data = build_aux(vec1, vec2)
+%BUILD_AUX sets up the auxiliary function for merging sorted vectors. The
+%function changes on every iteration according enter_jumps and exit_jumps,
+%this helper produces that structure
+%
+%last updated 09/23/26 by Adam Petrucci
+
+    return_data =  @(ind1,ind2,hit1,hit2) ...
+                    aux_helper(ind1,ind2,hit1,hit2,vec1,vec2);
+end
+
+function return_data = aux_helper(ind1,ind2,hit1,hit2,vec1,vec2)
+%AUX_HELPER is the actual auxiliary function, with more variables than the
+%merge_sorted method can actually take (hence the combination with
+%build_aux)
+%
+%last updated 09/23/26 by Adam Petrucci
+
+    j = 0;
+
+    if hit1    % response to action of first vector
+        j = j + vec1(ind1);
+    end
+
+    if hit2    % response to action of second vector
+        j = j + vec2(ind2);
+    end
+
+    return_data = j;
 
 end
