@@ -2,7 +2,7 @@ function return_data = big_experiment(parameters,ic_c,p_sampler,parameter_range,
 %BIG_EXPERIMENT simulates MF and NODE for various parameter regimes for the
 %purposes of comparison
 %
-%last updated 09/04/26 by Adam Petrucci
+%last updated 09/24/26 by Adam Petrucci
 arguments (Input)
     parameters      % parameter struct (mostly to be overwritten)
     ic_c            % continuous IC (as vector)
@@ -58,17 +58,17 @@ end
 
     exp_colec = cell([size(pr,1),1]);
 
-    error_data_mf = struct('parameters', {}, ...
-                           'message', {}, ...
-                           'identifier', {}, ...
-                           'stack', {}, ...
-                           'report', {});
+    %error_data_mf = struct('parameters', {}, ...
+    %                       'message', {}, ...
+    %                       'identifier', {}, ...
+    %                       'stack', {}, ...
+    %                       'report', {});
 
-    error_data_node = struct('parameters', {}, ...
-                             'message', {}, ...
-                             'identifier', {}, ...
-                             'stack', {}, ...
-                             'report', {});
+    %error_data_node = struct('parameters', {}, ...
+    %                         'message', {}, ...
+    %                         'identifier', {}, ...
+    %                         'stack', {}, ...
+    %                         'report', {});
 
     %****************************
     % Run Simulations
@@ -119,11 +119,11 @@ end
                 % If simulation returns error, save parameters for
                 % later investigation without terminating
                 % experiment
-                try
+                %try
 
                     % Run mean-field simulation
                     [time_mf, data_mf, ~, ~, end_mf] = ...
-                            cont_proof(ic_c,parameters,...
+                            cont_cons_lag(ic_c,parameters,...
                                             "Update",false,...
                                             "Collect",true, ...
                                             "Track",false, ...
@@ -138,44 +138,44 @@ end
                     [trans_mf,stable_mf] = ...
                         analyze_clusters(time_mf,clusters_mf);
 
-                catch ME
+                %catch ME
 
-                    fprintf("ERROR simulating MF with" + ...
-                            "parameter set:\n" + ...
-                            "[s1, s2, r1, r2] = " + ...
-                            "[0.0, %.2f, %.2f, %.2f]\n",...
-                            parameters.s2,parameters.r1,parameters.r2);
-                    fprintf('%s\n', ME.message);
+                %    fprintf("ERROR simulating MF with" + ...
+                %            "parameter set:\n" + ...
+                %            "[s1, s2, r1, r2] = " + ...
+                %            "[0.0, %.2f, %.2f, %.2f]\n",...
+                %            parameters.s2,parameters.r1,parameters.r2);
+                %    fprintf('%s\n', ME.message);
 
-                    num_errors = numel(error_data_mf) + 1;
+                %    num_errors = numel(error_data_mf) + 1;
 
-                    error_data_mf(num_errors).parameters = parameters;
-                    error_data_mf(num_errors).message = ME.message;
-                    error_data_mf(num_errors).identifier = ME.identifier;
-                    error_data_mf(num_errors).stack = ME.stack;
-                    error_data_mf(num_errors).report = getReport(ME);
+                %    error_data_mf(num_errors).parameters = parameters;
+                %    error_data_mf(num_errors).message = ME.message;
+                %    error_data_mf(num_errors).identifier = ME.identifier;
+                %    error_data_mf(num_errors).stack = ME.stack;
+                %    error_data_mf(num_errors).report = getReport(ME);
 
-                    time_mf = 0;
-                    data_mf = ic_c;
-                    end_mf = 0;
-                    trans_mf = 0;
-                    stable_mf = 0;
+                %    time_mf = 0;
+                %    data_mf = ic_c;
+                %    end_mf = 0;
+                %    trans_mf = 0;
+                %    stable_mf = 0;
 
-                end
+                %end
 
-                exp_colec(ps) = struct( ...
+                exp_colec{ps} = struct( ...
                                'parameter_set',[parameters.s1,...
                                                 parameters.s2,...
                                                 parameters.r1,...
                                                 parameters.r2],...
                                'mf_endstate',stable_mf,...
-                               'mf_endtime',time_mf,...
-                               'mf_enddata',data_mf,...
+                               'mf_endtime',time_mf(end),...
+                               'mf_enddata',squeeze(data_mf(end,:)),...
                                'mf_transtime',trans_mf,...
                                'mf_clusters',end_mf,...
                                'node_endstate',zeros([length(N),trials]),...
                                'node_endtime',zeros([length(N),trials]),...
-                               'node_enddata',cell([length(N),1]),...
+                               'node_enddata',{cell([length(N),1])},...
                                'node_transtime',zeros([length(N),trials]),...
                                'node_clusters',zeros([length(N),trials]));
 
@@ -191,7 +191,7 @@ end
                     % Set up storage for NODE data
                     %exp_colec{l2}{l3}{l4}{3}{n} = cell([1,trials]);
 
-                    exp_colec{ps}.endstate{n} = zeros([t,N(n)]);
+                    exp_colec{ps}.endstate{n} = zeros([trials,N(n)]);
 
                     for t = 1:trials
 
@@ -204,7 +204,7 @@ end
                         % If simulation returns error, save parameters for
                         % later investigation without terminating
                         % experiment
-                        try
+                        %try
 
                             % Run NODE simulation
                             [time_node, data_node, ~, ~, end_node] = ...
@@ -224,34 +224,34 @@ end
                             [trans_node,stable_node] = ...
                                 analyze_clusters(time_node,clusters_node);
 
-                        catch ME
+                        %catch ME
 
-                            fprintf("ERROR simulating NODE with" + ...
-                                "parameter set:\n" + ...
-                                "[s1, s2, r1, r2] = " + ...
-                                "[0.0, %.2f, %.2f, %.2f]\n",...
-                                parameters.s2,parameters.r1,parameters.r2);
-                            fprintf('%s\n', ME.message);
+                        %    fprintf("ERROR simulating NODE with" + ...
+                        %        "parameter set:\n" + ...
+                        %        "[s1, s2, r1, r2] = " + ...
+                        %        "[0.0, %.2f, %.2f, %.2f]\n",...
+                        %        parameters.s2,parameters.r1,parameters.r2);
+                        %    fprintf('%s\n', ME.message);
 
-                            num_errors = numel(error_data_node) + 1;
+                        %    num_errors = numel(error_data_node) + 1;
 
-                            error_data_node(num_errors).parameters = parameters;
-                            error_data_node(num_errors).message = ME.message;
-                            error_data_node(num_errors).identifier = ME.identifier;
-                            error_data_node(num_errors).stack = ME.stack;
-                            error_data_node(num_errors).report = getReport(ME);
+                        %    error_data_node(num_errors).parameters = parameters;
+                        %    error_data_node(num_errors).message = ME.message;
+                        %    error_data_node(num_errors).identifier = ME.identifier;
+                        %    error_data_node(num_errors).stack = ME.stack;
+                        %    error_data_node(num_errors).report = getReport(ME);
 
-                            time_node = 0;
-                            data_node = ic_p;
-                            end_node = 0;
-                            trans_node = 0;
-                            stable_node = 0;
+                        %    time_node = 0;
+                        %    data_node = ic_p;
+                        %    end_node = 0;
+                        %    trans_node = 0;
+                        %    stable_node = 0;
 
-                        end
+                        %end
 
                         exp_colec{ps}.node_endstate(n,t) = end_node;
-                        exp_colec{ps}.node_endtime(n,t) = time_node;
-                        exp_colec{ps}.node_enddata{n}(t,:) = data_node;
+                        exp_colec{ps}.node_endtime(n,t) = time_node(end);
+                        exp_colec{ps}.node_enddata{n}(t,:) = squeeze(data_node(end,:));
                         exp_colec{ps}.node_trans_node(n,t) = trans_node;
                         exp_colec{ps}.node_clusters(n,t) = stable_node;
 
@@ -281,8 +281,8 @@ end
                 % Save, if requested
                 if ~strcmp(save_data,"N")
                     save(save_data,"exp_colec");
-                    save("error_mf_" + save_data, "error_data_mf");
-                    save("error_node_" + save_data, "error_data_node");
+                    %save("error_mf_" + save_data, "error_data_mf");
+                    %save("error_node_" + save_data, "error_data_node");
                 end
 
             %end % for L4
