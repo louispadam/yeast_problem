@@ -1,23 +1,20 @@
-function return_data = frame(x_data,params,axis,options)
-%FRAME Present simulation data on a provided axis handle. Accepts a cell
-% array, each element of which is a vector or discretized continuum of
-% particles.
+function return_data = frame_cumsum(params,axis,options)
+%FRAME_CUMSUM presents simulation data as a cumulative distribution
 %
-%last updated 10/05/25
+%last updated 10/05/26
 arguments (Input)
-    x_data (1,:) double     % discretization of domain
-    params struct       % parameters used for simulation
+    params struct           % parameters used for simulation
     axis                    % axis to format
 end
 arguments (Input)
     options.Regions logical = false         % show regions?
     options.Region_labels logical = false   % add regions to legend?
     options.Data = {}                       % data to plot
+                                                % left boundaries
+                                                % masses
     options.Meta = {}                       % meta data: struct with
                                                 % name (string)
-                                                % discrete (boolean)
                                                 % color (rgb)
-                                                % thickness (double)
     options.Title = ""                      % title of axis
     options.Legend logical = false          % include legend?
 end
@@ -30,7 +27,6 @@ end
     %****************************
 
     % Required Inputs
-    x = x_data;
     ax = axis;
 
     % Optional Inputs
@@ -42,35 +38,31 @@ end
     s2 = params.s2;
     r1 = params.r1;
     r2 = params.r2;
-    ct = params.ct;
-
-    %****************************
-    % Compile Data
-    %****************************
-    data_l = length(data);
-    to_plot = zeros([data_l,length(x)]);
-
-    % Collect data to plot
-    for k = 1:data_l
-        arr = data{k};
-
-        % if discrete data, thicken
-        if meta{k}.discrete
-            arr = fatten_points_polynomial(x,arr,meta{k}.thickness);
-        end
-
-        to_plot(k,:) = arr;
-    end
 
     %****************************
     % Construct Figures
     %****************************
 
-    hold(ax,"on");
-    si = size(to_plot);
+    data_l = length(data);
 
-    for k = 1:si(1)
-        u = to_plot(k,:);
+    hold(ax,"on");
+
+    % Collect data to plot
+    for k = 1:data_l
+
+        % Extract data. The circle is represented [0,1), so the data never
+        % includes the right endpoint. It is added manually to clean up the
+        % graph
+        arr = data{k};
+        arr_x = [arr(1,:),1];
+        arr_y = [cumsum(arr(2,:)),1];
+
+        % If the data does not include the left endpoint, it is added
+        % manually to clean up the graph
+        if arr_x(1) ~= 0
+            arr_x = [0,arr_x];
+            arr_y = [0,arr_y];
+        end
 
         % Set name
         name = meta{k}.name;
@@ -81,27 +73,24 @@ end
         % Set Color; default is gradient of greys
         color = meta{k}.color;
         if color == [-1,-1,-1]
-            color = ([220,220,220] + ([105,105,105]-[220,220,220])*k/si(1))/255;
+            color = ([220,220,220] + ([105,105,105]-[220,220,220])*k/data_l(1))/255;
         end
 
         % Plot
-        plot(ax,x,u,'linewidth',2,'DisplayName',name,'Color',color);
+        plot(ax,arr_x,arr_y,'linewidth',2,'DisplayName',name,'Color',color);
 
     end
-    
-    % Determine upper bound of figure
-    m = max(to_plot,[],"all");
 
     % Parameters for plot
     ax.XLim = [0 1];
-    ax.YLim = [0 m*1.1];
+    ax.YLim = [0,1];
 
-    % If desired, show regions
+    % If desired, show cutoff regions
     if options.Regions
         shade_regions(ax,params,"Region_Labels",options.Region_labels);
     end
 
-    ylabel(ax,'Density');
+    ylabel(ax,'Cumulative Mass');
     xlabel(ax,'Position');
     title(ax,options.Title,'Fontsize',18,'FontWeight', 'bold')
     if options.Legend

@@ -67,7 +67,7 @@ end
 
     end
 
-    % adjust size (in case there were doubles;
+    % adjust size (in case there were doubles)
     merged = merged(1:k);
     aux = aux(1:k);
 

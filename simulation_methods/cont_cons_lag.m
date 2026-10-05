@@ -5,7 +5,7 @@ function [return_time, return_data, return_clock, return_conv, ...
 %of yeast metabolism. It is built from the proof-scheme for NODE but uses
 %the convergence criterion from the the proof-scheme for MF.
 %
-%last updated 09/23/26 by Adam Petrucci
+%last updated 10/02/26 by Adam Petrucci
 arguments (Input)
     initial (1,:)       % initial conditions
     params struct       % parameters for simulation
@@ -23,10 +23,11 @@ arguments (Input)
                              % to be a reasonable tolerance for catching
                              % metastable states
     options.Track = false    % collect and return convergence data
+    options.Eulerian = false % return Eulerian mesh
 end
 arguments (Output)
     return_time (1,:)   % discretized time axis of simulation
-    return_data (:,:)   % simulation results: [time,data]
+    return_data         % simulation results: [time,data]
     return_clock        % total real-time for simulation
     return_conv         % convergence data
     return_end          % end by convergence or walltime
@@ -39,9 +40,10 @@ end
     % Process Inputs
     %****************************
 
-    d0 = initial;          % collect density
-    N = length(d0);        % number of cells (particles)
-    ic = 0:1/N:1-1/N;      % cell boundaries  
+    d0 = initial;                  % collect density
+    N_eul = length(d0);            % number of cells (particles)
+    N_lag = N_eul;                 % size of lag and eul grids match
+    ic = 0:1/N_eul:1-1/N_eul;      % cell boundaries  
 
     % mass in each cell by linear approximation of density
     mass = ([d0(2:end) + d0(1:end-1), d0(1) + d0(end)] .* ...
@@ -52,18 +54,19 @@ end
     ud = options.Update;
     tol = options.Tolerance;
     trak = options.Track;
+    eul = options.Eulerian;
 
     %****************************
     % Change coordinate System
     %****************************
     % Change coordinate system so that r2_tilde = 1 = 0.
-    % WARNING: there is an approximation here, I 
+    % WARNING: there is approximation here
 
     r1_tilde = mod(params.r1 - params.r2,1);
     s1_tilde = mod(params.s1 - params.r2,1);
     s2_tilde = mod(params.s2 - params.r2,1);
     [~, shift_ind] = min(abs(ic-params.r2));  % to undo shift later
-    ic = mod(ic-params.r2,1);
+    [ic, labels] = sort(mod(ic-params.r2,1));
 
     %****************************
     % Set up Scheme
@@ -72,18 +75,27 @@ end
 
     % Scheme requires 'particles' to be ordered.
     % Saving labels helps monitor mass
-    [d, labels] = sort(ic);   % iteration vector for data
+    %[d, labels] = sort(ic);   % iteration vector for data
+    d = ic;
     tt = 0;                   % current time
 
     % Instantiate storage objects according to whether user calls for data
     % at every revolution or only the final state.
     collect = options.Collect;
     if collect
-        time = zeros([1,1000]);            % time vector (dynamic)
-        data = zeros([1000,length(ic)]);   % state vector (dynamic)
+        time = zeros([1,1000]);                % time vector (dynamic)
+        if eul
+            data = zeros([1000,length(ic)]);   % eul state vector (dynamic)
+        else
+            data = zeros([1000,2,length(ic)]); % lag state vector (dynamic)
+        end
     else
-        time = zeros([2,1]);              % time vector (initial and final)
-        data = zeros([2,length(ic)]);     % time vector (initial and final)
+        time = zeros([2,1]);                % time vector (static)
+        if eul
+            data = zeros([2,length(ic)]);   % eul state vector(static)
+        else
+            data = zeros([2,2,length(ic)]); % lag state vector (static)
+        end
     end
     conv_data = zeros(size(time));        % convergence vector
 
@@ -98,8 +110,14 @@ end
     fxd_dt = s1_tilde;
 
     % Store initial state
-    data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
-                              shift_ind-1);
+    if eul
+        data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+                                  shift_ind-1);
+    else
+        [pos_save,mass_save] = lagrange_unshift(d,mass(labels),params.r2);
+        data(rev_c,1,:) = pos_save;
+        data(rev_c,2,:) = mass_save;
+    end
 
     %****************************
     % Iterate
@@ -151,8 +169,8 @@ end
             N0 = density_ext(in_ind) * (s2_tilde - s1_tilde);
         else
             N0 = density_ext(in_ind) * (d_ext(in_ind+1) - s1_tilde) + ...
-                sum(mass_ext(in_ind+1:out_ind-1)) + ...
-                density_ext(out_ind) * (s2_tilde - d_ext(out_ind));
+                 sum(mass_ext(in_ind+1:out_ind-1)) + ...
+                 density_ext(out_ind) * (s2_tilde - d_ext(out_ind));
         end
 
         % Adjust ordering of events in vector
@@ -162,8 +180,8 @@ end
         exit_inds  = flip(exit_inds);
 
         % Compute change population at each event
-        enter_jumps = density(mod(enter_inds-2,N) + 1) - density(enter_inds);
-        exit_jumps = density(exit_inds) - density(mod(exit_inds-2,N) + 1);
+        enter_jumps = density(mod(enter_inds-2,N_lag) + 1) - density(enter_inds);
+        exit_jumps = density(exit_inds) - density(mod(exit_inds-2,N_lag) + 1);
 
         % Combing changes in population into a single, ordered vector
         [event_times, jumps] = merge_sorted(enter_times,exit_times,...
@@ -222,7 +240,7 @@ end
                 phantom_exit_time = times(phantom_exit_index) + ...
                                     2*phantom_exit_diff/(speeds(phantom_exit_index) + ...
                                     sqrt(speeds(phantom_exit_index)^2 - ...
-                                    2*phantom_exit_diff*flux(phantom_exit_index)));
+                                    2*params.alph*phantom_exit_diff*flux(phantom_exit_index)));
                 dt = phantom_exit_time;
                 phantom = 0;
 
@@ -292,7 +310,7 @@ end
                 C = targets(i) - H(k);
                 discr = speeds(k)^2 - 2*params.alph*flux(k)*C;
                 exit_time = times(k) + 2*C / (speeds(k) + sqrt(discr));
-                d(r_ind(i)) = 1 + dt - exit_time;
+                d(r_ind(i)) = dt - exit_time;
             end
         end
 
@@ -322,18 +340,31 @@ end
             % Update data storage
             if collect
                 time(rev_c) = tt;
-                data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
-                                          shift_ind-1);
+                if eul
+                    data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+                                              shift_ind-1);
+                else
+                    [pos_save,mass_save] = lagrange_unshift(d,mass(labels),params.r2);
+                    data(rev_c,1,:) = pos_save;
+                    data(rev_c,2,:) = mass_save;
+                end
                 
                 % Check if storage vectors need to be extended
                 if rev_c == length(time)
                     time(end + 1000) = 0;
-                    data(end + 1000,:) = 0;
                     conv_data(end + 1000) = 0;
+                    if eul 
+                        data(end + 1000,:) = 0;
+                    else
+                        data(end + 1000,:,:) = 0;
+                    end
                 end
             end
 
             % Compute difference between points of Poincare map
+
+            %find(diff(d)<=0)
+            %find(diff(prior_mesh)<=0)
             change = metric_wasserstein1_lag(d,mass(labels),...
                                              prior_mesh,prior_mass);
             if trak
@@ -364,8 +395,14 @@ end
 
         % store ending time and data according to original positions
         time(2) = tt;
-        data(2,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
-                              shift_ind-1);
+        if eul
+            data(2,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+                                  shift_ind-1);
+        else
+            [pos_save,mass_save] = lagrange_unshift(d,mass(labels),params.r2);
+            data(2,1,:) = pos_save;
+            data(2,2,:) = mass_save;
+        end
     end
 
     % Stop timer
@@ -375,13 +412,16 @@ end
     % the change of coordinates
     if collect
         return_time = time(1:rev_c);
-        data = data(1:rev_c,:);
-        return_data = data;
         return_conv = conv_data(2:rev_c);
+        if eul
+            return_data = data(1:rev_c,:);
+        else
+            return_data = data(1:rev_c,:,:);
+        end
     else
         return_time = time;
-        return_data = data;
         return_conv = conv_data(2:end);
+        return_data = data;
     end
     return_clock = end_time;
 
@@ -408,36 +448,18 @@ end % of main function
 % HELPER FUNCTION(S)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function return_data = lagrange_to_euler(lag_coord, eul_coord, mass)
-%LAGRANGE_TO_EULER converts lagrangian coordinates to the original eulerian
-%coordinates in which initial data were given. This is purely for
-%presentation, it does not impact the algorithm.
+function [x,mass_out] = lagrange_unshift(d,mass_in,r2)
+%LAGRANGE_UNSHIFT un-does the initial shift in coordinates. It's only given
+%its own function to clean up the code.
 %
-%last updated 09/23/26 by Adam Petrucci
+%last updated 10/05/26 by Adam Petrucci
 
-    % Periodic extension (for easy vectorization)
-    d_ext = [lag_coord(end)-1, lag_coord, lag_coord(1)+1];
-    ic_ext = [eul_coord,1];
-    mass_ext = [mass(end), mass];
-    cum_mass = [0, cumsum(mass_ext)];
-
-    % Compute density on each cell
-    density_lag = mass_ext ./ diff(d_ext);
-
-    % linear interpolation of mass in Eulerian cells, leveraging
-    % monotonicity of vectors
-    interp_mass = zeros(size(ic_ext));
-    k = 1;
-    for i = 1:length(ic_ext)
-        while k < length(mass_ext) && ic_ext(i) >= d_ext(k+1)
-              k = k + 1;
-        end
-        interp_mass(i) = cum_mass(k) ...
-                + density_lag(k) * (ic_ext(i) - d_ext(k));
+    x = mod(d+r2,1);
+    j = find(diff(x)<0,1);
+    if ~isempty(j)
+        x = [x(j+1:end),x(1:j)];
+        mass_out = [mass_in(j+1:end),mass_in(1:j)];
     end
-
-    % density on Eulerian mesh
-    return_data = diff(interp_mass) ./ diff(ic_ext);
 
 end
 
@@ -470,5 +492,75 @@ function return_data = aux_helper(ind1,ind2,hit1,hit2,vec1,vec2)
     end
 
     return_data = j;
+
+end
+
+function [d,mass,nmerge] = check_cell_widths(d,mass,tol)
+%CHECK_CELL_WIDTHS merges cells when they become too small for computer
+%precision, as approximated by tol
+%
+%last updated 10/02/26 by Adam Petrucci
+arguments (Input)
+    d          % cell boundaries
+    mass       % cell masses m(i) corresponds to left boundary d(i)
+    tol        % width to merge
+end
+arguments (Output)
+    d          % updated boundaries
+    mass       % updated masses
+    nmerge     % total number of merges
+end
+
+    % compute widths
+    width = [diff(d), d(1)+1-d(end)];
+
+    N = length(d);
+    ind = 1;
+    nmerge = 0;
+
+    % loop across whole vector
+    while ind < N+1
+
+        % get current width
+        curr = width(ind);
+
+        % check width admissability
+        if curr < tol
+
+            % determine neighboring cells
+            ind_left = mod(ind-2,N)+1;
+            ind_right = mod(ind,N)+1;
+
+            % determine which cell to merge with
+            if width(ind_left) < width(ind_right) % merge left
+
+                % merge current into left, delete current
+                width(ind_left) = width(ind_left) + curr;
+                mass(ind_left) = mass(ind_left) + mass(ind);
+                mass(ind) = [];
+                d(ind) = [];
+
+            else % merge right
+
+                % merge right into current, delete current
+                width(ind) = curr + width(ind_right);
+                mass(ind) = mass(ind) + mass(ind_right);
+                mass(ind_right) = [];
+                d(ind_right) = [];
+
+            end
+
+            % update vector length
+            N = N-1;
+            nmerge = nmerge + 1;
+
+        else
+
+            % if no merge is necessary, move on to next cell
+            ind = ind + 1;
+
+        end
+
+    end
 
 end
