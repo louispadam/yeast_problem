@@ -34,7 +34,7 @@ arguments (Output)
 end
 
     % Begin timer
-    tic
+    timer = tic;
 
     %****************************
     % Process Inputs
@@ -42,12 +42,11 @@ end
 
     d0 = initial;                  % collect density
     N_eul = length(d0);            % number of cells (particles)
-    N_lag = N_eul;                 % size of lag and eul grids match
     ic = 0:1/N_eul:1-1/N_eul;      % cell boundaries  
 
     % mass in each cell by linear approximation of density
-    mass = ([d0(2:end) + d0(1:end-1), d0(1) + d0(end)] .* ...
-            [ic(2:end) - ic(1:end-1), mod(ic(1) - ic(end),1)])/2;
+    mass_curr = ([d0(2:end) + d0(1:end-1), d0(1) + d0(end)] .* ...
+                 [ic(2:end) - ic(1:end-1), mod(ic(1) - ic(end),1)])/2;
 
     % collect numerical parameters
     t_final = options.EndTime;
@@ -66,7 +65,12 @@ end
     s1_tilde = mod(params.s1 - params.r2,1);
     s2_tilde = mod(params.s2 - params.r2,1);
     [~, shift_ind] = min(abs(ic-params.r2));  % to undo shift later
-    [ic, labels] = sort(mod(ic-params.r2,1));
+    ic = mod(ic-params.r2,1);
+    j = find(diff(ic)<0,1);
+    if ~isempty(j)
+        ic = [ic(j+1:end), ic(1:j)];
+        mass_curr = [mass_curr(j+1:end),mass_curr(1:j)];
+    end
 
     %****************************
     % Set up Scheme
@@ -75,7 +79,6 @@ end
 
     % Scheme requires 'particles' to be ordered.
     % Saving labels helps monitor mass
-    %[d, labels] = sort(ic);   % iteration vector for data
     d = ic;
     tt = 0;                   % current time
 
@@ -103,18 +106,22 @@ end
     time(rev_c) = tt;                     % save first time (0)
 
     % Store state at previous revolution (for convergence criterion)
-    prior_mesh = d;              % previous positions
-    prior_mass = mass(labels);   % previous mass assignments
+    [x,rho,atom,mass_cell] = split_sing_cont(d,mass_curr);
+    prior_mesh = x;
+    prior_rho = rho;
+    prior_atom = atom;
 
     % Automatically use optimal timestep
     fxd_dt = s1_tilde;
 
     % Store initial state
     if eul
-        data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+        data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass_curr,...
+                                                    "Rho",rho,...
+                                                    "Atom",atom),...
                                   shift_ind-1);
     else
-        [pos_save,mass_save] = lagrange_unshift(d,mass(labels),params.r2);
+        [pos_save,mass_save] = lagrange_unshift(d,mass_curr,params.r2);
         data(rev_c,1,:) = pos_save;
         data(rev_c,2,:) = mass_save;
     end
@@ -125,7 +132,8 @@ end
 
     % Give progress update (if desired).
     if ud
-        fprintf("Began Simulation\n");
+        fprintf("Began Simulation of Mean-Field with " + ...
+                "Conservative Lagrangian scheme\n");
     end
 
     % initialize timestep and phantom 'particle'
@@ -145,62 +153,61 @@ end
             dt = fxd_dt;
         end
 
-        % Construct entry/exit events relative to S
-        enter_events = s1_tilde - d;
-        enter_inds = find(enter_events > 0 & enter_events < dt);
-        enter_times = enter_events(enter_events > 0 & enter_events < dt);
-        exit_events = s2_tilde - d;
-        exit_inds = find(exit_events > 0 & exit_events < dt);
-        exit_times = exit_events(exit_events > 0 & exit_events < dt);
-
-        % Compute density
-        mass_curr = mass(labels);
-        density = mass_curr ./ ...
-                  [d(2:end)-d(1:end-1), d(1)-d(end)+1];
-        d_ext = [d(end)-1, d, d(1)+1];
-        mass_ext = [mass_curr(end), mass_curr];
-        density_ext = [density(end), density];
+        % Split into continuous and singular components
+        x_ext    = [x(end)-1,x,x(1)+1];
+        rho_ext  = [rho(end),rho];
+        cont_mass_ext = [mass_cell(end),mass_cell];
 
         % Determine initial population of S
-        in_ind = find(d_ext <= s1_tilde,1,'last');  % last index pre-S
-        out_ind = find(d_ext <= s2_tilde,1,'last'); % last index in S
+        in_ind  = find(x_ext < s1_tilde,1,'last');  % last index pre-S
+        out_ind = find(x_ext < s2_tilde,1,'last');  % last index in S
 
+        % Compute initial S population
         if in_ind == out_ind
-            N0 = density_ext(in_ind) * (s2_tilde - s1_tilde);
+            N0 = rho_ext(in_ind) * (s2_tilde-s1_tilde);
         else
-            N0 = density_ext(in_ind) * (d_ext(in_ind+1) - s1_tilde) + ...
-                 sum(mass_ext(in_ind+1:out_ind-1)) + ...
-                 density_ext(out_ind) * (s2_tilde - d_ext(out_ind));
+            N0 = rho_ext(in_ind)*(x_ext(in_ind+1)-s1_tilde) + ...
+                      sum(cont_mass_ext(in_ind+1:out_ind-1)) + ...
+                      rho_ext(out_ind)*(s2_tilde-x_ext(out_ind));
         end
+        N0 = N0 + sum(atom(in_ind : out_ind-1));
 
-        % Adjust ordering of events in vector
-        enter_times = flip(enter_times);
-        enter_inds  = flip(enter_inds);
-        exit_times = flip(exit_times);
-        exit_inds  = flip(exit_inds);
-
+        % Construct entry/exit events relative to S
+        enter_events = s1_tilde-x;
+        enter_inds = enter_events > 0 & enter_events < dt;
+        enter_times = flip(enter_events(enter_inds));
+        exit_events = s2_tilde-x;
+        exit_inds = exit_events > 0 & exit_events < dt;
+        exit_times = flip(exit_events(exit_inds));
+        
         % Compute change population at each event
-        enter_jumps = density(mod(enter_inds-2,N_lag) + 1) - density(enter_inds);
-        exit_jumps = density(exit_inds) - density(mod(exit_inds-2,N_lag) + 1);
+        flux_changes = [rho(end),rho(1:end-1)]-rho;
+        enter_flux_jumps = flip(flux_changes(enter_inds));
+        exit_flux_jumps = flip(-flux_changes(exit_inds));
+        enter_atom_jumps = flip(atom(enter_inds));
+        exit_atom_jumps = flip(-atom(exit_inds));
 
         % Combing changes in population into a single, ordered vector
         [event_times, jumps] = merge_sorted(enter_times,exit_times,...
-                               'AuxFun',build_aux(enter_jumps,exit_jumps));
+                    'AuxFun',build_aux(enter_flux_jumps,exit_flux_jumps,...
+                                       enter_atom_jumps,exit_atom_jumps),...
+                                       'AuxD',2);
+        cont_jumps = jumps(1,:);
+        atom_jumps = jumps(2,:);
 
         % Compute population of S
-        in_left  = find(d_ext < s1_tilde,1,'last');
-        out_left = find(d_ext < s2_tilde,1,'last');
-        flux0 = density_ext(in_left) - density_ext(out_left);
-        flux = flux0 + [0, cumsum(jumps)];
+        flux0 = rho_ext(in_ind)-rho_ext(out_ind);
+
+        flux = flux0 + [0, cumsum(cont_jumps)];
         times = [0, event_times, dt];
-        Ns = N0 + [0,cumsum(flux .* diff(times))];
+        Ns = N0 + [0,cumsum(flux .* diff(times) + [atom_jumps,0])];
 
         % Compute speed in R after each event
         speeds = 1 - params.alph*Ns;
+        speeds_minus = speeds(1:end-1) - params.alph*flux.*diff(times);
 
         % Add boundary times and compute net displacement for particle in R
-        times = [0, event_times, dt];
-        H = [0, cumsum(0.5 *(speeds(1:end-1) + speeds(2:end)) ...
+        H = [0, cumsum(0.5 *(speeds(1:end-1) + speeds_minus) ...
                           .* diff(times))];
 
         % Evolve the phantom particle according to three cases.
@@ -254,7 +261,7 @@ end
                     speeds = [speeds(1:phantom_exit_index), ...
                             speeds(phantom_exit_index) - params.alph*flux(phantom_exit_index)*tau];
                     H = [H(1:phantom_exit_index), ...
-                        H(phantom_exit_index) + speeds(phantom_exit_index)*tau ...
+                         H(phantom_exit_index) + speeds(phantom_exit_index)*tau ...
                             - 0.5*params.alph*flux(phantom_exit_index)*tau^2];
                     flux = flux(1:phantom_exit_index);
 
@@ -325,8 +332,11 @@ end
         j = find(diff(d)<0,1);
         if ~isempty(j)
             d = [d(j+1:end), d(1:j)];
-            labels = [labels(j+1:end), labels(1:j)];
+            mass_curr = [mass_curr(j+1:end),mass_curr(1:j)];
+            %labels = [labels(j+1:end), labels(1:j)];
         end
+
+        [x,rho,atom,mass_cell] = split_sing_cont(d,mass_curr);
 
         % Update current time
         tt = tt + dt;
@@ -341,10 +351,10 @@ end
             if collect
                 time(rev_c) = tt;
                 if eul
-                    data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+                    data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass_curr),...
                                               shift_ind-1);
                 else
-                    [pos_save,mass_save] = lagrange_unshift(d,mass(labels),params.r2);
+                    [pos_save,mass_save] = lagrange_unshift(d,mass_curr,params.r2);
                     data(rev_c,1,:) = pos_save;
                     data(rev_c,2,:) = mass_save;
                 end
@@ -362,11 +372,14 @@ end
             end
 
             % Compute difference between points of Poincare map
+            change = metric_wasserstein1_lag(x,mass_curr,...
+                                             prior_mesh,mass_curr,...
+                                             'Rho1',rho,'Atom1',atom,...
+                                             'Rho2',prior_rho,'Atom2',prior_atom);
+            prior_mesh = x;
+            prior_rho = rho;
+            prior_atom = atom;
 
-            %find(diff(d)<=0)
-            %find(diff(prior_mesh)<=0)
-            change = metric_wasserstein1_lag(d,mass(labels),...
-                                             prior_mesh,prior_mass);
             if trak
                 conv_data(rev_c) = change;
             end
@@ -374,16 +387,9 @@ end
             % Check for convergence
             converged = change < tol;
 
-            % Reset revolution counter
-            %new_rev = false;
-
-            % Update previous revolution state
-            prior_mesh = d;
-            prior_mass = mass(labels);
-
             % Give progress update (if desired).
-            if ud && (mod(rev_c,100) == 0)
-                fprintf('Reached revolution %d at time %.2f\n',rev_c,tt);
+            if ud && (mod(rev_c,10) == 0)
+                fprintf('Reached revolution %d at in-game time %.2f and real time %.2f\n',rev_c,tt,toc(timer));
             end
 
         end % of revolution block
@@ -396,17 +402,17 @@ end
         % store ending time and data according to original positions
         time(2) = tt;
         if eul
-            data(2,:) = circshift(lagrange_to_euler(d,ic,mass(labels)),...
+            data(2,:) = circshift(lagrange_to_euler(d,ic,mass_curr),...
                                   shift_ind-1);
         else
-            [pos_save,mass_save] = lagrange_unshift(d,mass(labels),params.r2);
+            [pos_save,mass_save] = lagrange_unshift(d,mass_curr,params.r2);
             data(2,1,:) = pos_save;
             data(2,2,:) = mass_save;
         end
     end
 
     % Stop timer
-    end_time = toc;
+    end_time = toc(timer);
 
     % Return data, truncating storage objects appropriately and reverting
     % the change of coordinates
@@ -427,7 +433,9 @@ end
 
     % Give progress update (if desired).
     if ud
-        fprintf('Completed Simulation in %f seconds ',end_time);
+        fprintf("Completed Simulation of Mean-Field with " + ...
+                "Conservative Lagrangian scheme " + ...
+                "in %f seconds ",end_time);
         if tt >= t_final
             fprintf('hitting end time wall\n');
         else
@@ -459,11 +467,13 @@ function [x,mass_out] = lagrange_unshift(d,mass_in,r2)
     if ~isempty(j)
         x = [x(j+1:end),x(1:j)];
         mass_out = [mass_in(j+1:end),mass_in(1:j)];
+    else
+        mass_out = mass_in;
     end
 
 end
 
-function return_data = build_aux(vec1, vec2)
+function return_data = build_aux(vec1,vec2,vec3,vec4)
 %BUILD_AUX sets up the auxiliary function for merging sorted vectors. The
 %function changes on every iteration according enter_jumps and exit_jumps,
 %this helper produces that structure
@@ -471,96 +481,27 @@ function return_data = build_aux(vec1, vec2)
 %last updated 09/23/26 by Adam Petrucci
 
     return_data =  @(ind1,ind2,hit1,hit2) ...
-                    aux_helper(ind1,ind2,hit1,hit2,vec1,vec2);
+                    aux_helper(ind1,ind2,hit1,hit2,vec1,vec2,vec3,vec4);
 end
 
-function return_data = aux_helper(ind1,ind2,hit1,hit2,vec1,vec2)
+function return_data = aux_helper(ind1,ind2,hit1,hit2,vec1,vec2,vec3,vec4)
 %AUX_HELPER is the actual auxiliary function, with more variables than the
 %merge_sorted method can actually take (hence the combination with
 %build_aux)
 %
-%last updated 09/23/26 by Adam Petrucci
+%last updated 10/08/26 by Adam Petrucci
 
-    j = 0;
+    j = [0;0];
 
     if hit1    % response to action of first vector
-        j = j + vec1(ind1);
+        j = j + [vec1(ind1);vec3(ind1)];
     end
 
     if hit2    % response to action of second vector
-        j = j + vec2(ind2);
+        j = j + [vec2(ind2);vec4(ind2)];
+
     end
 
     return_data = j;
-
-end
-
-function [d,mass,nmerge] = check_cell_widths(d,mass,tol)
-%CHECK_CELL_WIDTHS merges cells when they become too small for computer
-%precision, as approximated by tol
-%
-%last updated 10/02/26 by Adam Petrucci
-arguments (Input)
-    d          % cell boundaries
-    mass       % cell masses m(i) corresponds to left boundary d(i)
-    tol        % width to merge
-end
-arguments (Output)
-    d          % updated boundaries
-    mass       % updated masses
-    nmerge     % total number of merges
-end
-
-    % compute widths
-    width = [diff(d), d(1)+1-d(end)];
-
-    N = length(d);
-    ind = 1;
-    nmerge = 0;
-
-    % loop across whole vector
-    while ind < N+1
-
-        % get current width
-        curr = width(ind);
-
-        % check width admissability
-        if curr < tol
-
-            % determine neighboring cells
-            ind_left = mod(ind-2,N)+1;
-            ind_right = mod(ind,N)+1;
-
-            % determine which cell to merge with
-            if width(ind_left) < width(ind_right) % merge left
-
-                % merge current into left, delete current
-                width(ind_left) = width(ind_left) + curr;
-                mass(ind_left) = mass(ind_left) + mass(ind);
-                mass(ind) = [];
-                d(ind) = [];
-
-            else % merge right
-
-                % merge right into current, delete current
-                width(ind) = curr + width(ind_right);
-                mass(ind) = mass(ind) + mass(ind_right);
-                mass(ind_right) = [];
-                d(ind_right) = [];
-
-            end
-
-            % update vector length
-            N = N-1;
-            nmerge = nmerge + 1;
-
-        else
-
-            % if no merge is necessary, move on to next cell
-            ind = ind + 1;
-
-        end
-
-    end
 
 end

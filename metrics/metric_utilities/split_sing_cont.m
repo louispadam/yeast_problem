@@ -1,8 +1,8 @@
-function [return_x,return_cont,return_sing] = split_sing_cong(mesh,mass)
+function [return_x,return_cont,return_sing,return_mass] = split_sing_cont(mesh,mass)
 %SPLIT_SING_CONT splits a periodic Langrangian mesh with associated mass
 %distribution into singular and continuous components
 %
-%last updated 10/05/26 by Adam Petrucci
+%last updated 10/08/26 by Adam Petrucci
 arguments (Input)
     mesh       % Lagrangian mesh
     mass       % masses associated to left boundaries
@@ -11,13 +11,15 @@ arguments (Output)
     return_x      % consolidated mesh (no repeats)
     return_cont   % continuous component
     return_sing   % singular components
+    return_mass   % mass on continuous segments
 end
 
     % Set up objects
     n = length(mesh);
     return_x    = zeros(1,n);
-    return_cont  = zeros(1,n);
+    return_cont = zeros(1,n);
     return_sing = zeros(1,n);
+    return_mass = zeros(1,n);
 
     i = 1;  % (original) mesh counter
     k = 0;  % (new) mesh counter
@@ -46,6 +48,7 @@ end
             width = mesh(1)+1-mesh(j);
         end
         return_cont(k) = mass(j)/width;
+        return_mass(k) = mass(j);
 
         % increment counter
         i = j+1;
@@ -56,5 +59,6 @@ end
     return_x    = return_x(1:k);
     return_cont = return_cont(1:k);
     return_sing = return_sing(1:k);
+    return_mass = return_mass(1:k);
 
 end

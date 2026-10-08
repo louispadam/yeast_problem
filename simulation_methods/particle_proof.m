@@ -126,7 +126,7 @@ end
 
     % Give progress update (if desired).
     if ud
-        fprintf("Began Simulation\n");
+        fprintf("Began Simulation of NODE via Lagrangian Scheme\n");
     end
 
     new_rev = false;    % bool for completing a revolution
@@ -302,7 +302,7 @@ end
 
     % Give progress update (if desired).
     if ud
-        fprintf('Completed Simulation in %f seconds ',end_time);
+        fprintf('Completed Simulation of NODE via Lagrangian Scheme in %f seconds ',end_time);
         if tt >= t_final
             fprintf('hitting end time wall\n');
         else

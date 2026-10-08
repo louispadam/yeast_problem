@@ -1,13 +1,19 @@
-function return_data = metric_wasserstein1_lag(mesh1,mass1,mesh2,mass2)
+function return_data = metric_wasserstein1_lag(mesh1,mass1,mesh2,mass2,options)
 %METRIC_WASSERSTEIN1_LAG computes Wasserstein distance between a pair of
 %periodic Lagrangian meshes. It can handle singular components
 %
-%last updated 10/05/26
+%last updated 10/08/26
 arguments (Input)
     mesh1           % periodic Langrangian mesh
     mass1           % masses associated to to left-boundary
     mesh2           % periodic Langrangian mesh
     mass2           % masses associated to to left-boundary
+end
+arguments (Input)
+    options.Rho1 = []
+    options.Atom1 = []
+    options.Rho2 = []
+    options.Atom2 = []
 end
 arguments (Output)
     return_data      % Wasserstein distance
@@ -22,9 +28,22 @@ end
     % Construct cumulative difference
     %****************************
 
-    % Split into singular and continuous components
-    [x1,rho1,atom1] = split_sing_cont(mesh1,mass1);
-    [x2,rho2,atom2] = split_sing_cont(mesh2,mass2);
+    x1 = mesh1;
+    x2 = mesh2;
+    rho1 = options.Rho1;
+    atom1 = options.Atom1;
+    rho2 = options.Rho2;
+    atom2 = options.Atom2;
+    if isempty(rho1)
+        [x1,rho1,atom1] = split_sing_cont(mesh1,mass1);
+    elseif isempty(atom1)
+        atom1 = zeros(size(rho1));
+    end
+    if isempty(rho2)
+        [x2,rho2,atom2] = split_sing_cont(mesh2,mass2);
+    elseif isempty(atom2)
+        atom2 = zeros(size(rho2));
+    end
 
     n1 = length(x1);
     n2 = length(x2);
