@@ -31,9 +31,9 @@ end
 
     % Periodic extensions
     d_ext    = [lag_coord(end)-1, lag_coord, lag_coord(1)+1];
-    rho_ext  = [rho(end), rho];
-    mass_ext = [cont_mass(end), cont_mass];
-    atom_ext = [atom(end), atom];
+    rho_ext  = [rho(end), rho, rho(1)];
+    mass_ext = [cont_mass(end), cont_mass, cont_mass(1)];
+    atom_ext = [atom(end), atom, atom(1)];
     ic_ext = [eul_coord,1];
 
     cum_mass = [0,cumsum(mass_ext + atom_ext)];

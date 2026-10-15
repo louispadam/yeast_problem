@@ -35,4 +35,7 @@ end
         set(get(get(patch_r, 'Annotation'), 'LegendInformation'),'IconDisplayStyle', 'off');
     end
 
+    uistack(patch_r,'bottom')
+    uistack(patch_s,'bottom')
+
 end

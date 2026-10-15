@@ -1,8 +1,3 @@
-# This is the primary file for code development and data analysis.
-# I hope to avoid merge conflicts by leaving each machine its own main file.
-# (this is effectively an alternative to branches since I'm the only developer)
-*main*
-
 # Ignore private data files. These are often temporary or for testing purposes.
 # I will be using private data on all machines, so made it a general part of project.
 data_private/*

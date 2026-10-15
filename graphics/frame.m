@@ -37,13 +37,6 @@ end
     data = options.Data;
     meta = options.Meta;
 
-    % Define Spatial Parameters
-    s1 = params.s1;
-    s2 = params.s2;
-    r1 = params.r1;
-    r2 = params.r2;
-    ct = params.ct;
-
     %****************************
     % Compile Data
     %****************************
