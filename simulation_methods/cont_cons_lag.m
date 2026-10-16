@@ -1,14 +1,14 @@
-function [return_time, return_data, return_clock, return_conv, ...
+function [return_time, return_mesh, return_mass, return_clock, return_conv, ...
           return_end] = ....
-         cont_cons_lag(initial, params, options)
+         cont_cons_lag(ic_data, params, options)
 %CONT_CONS_LAG is a conservative Lagrangian scheme for the mean-field model
 %of yeast metabolism. It is built from the proof-scheme for NODE but uses
 %the convergence criterion from the the proof-scheme for MF.
 %
-%last updated 10/02/26 by Adam Petrucci
+%last updated 10/16/26 by Adam Petrucci
 arguments (Input)
-    initial (1,:)       % initial conditions
-    params struct       % parameters for simulation
+    ic_data            % initial mesh and mass
+    params             % parameters for simulation
 end
 arguments (Input)
     options.EndTime = Inf    % maximum simulation time
@@ -23,11 +23,12 @@ arguments (Input)
                              % to be a reasonable tolerance for catching
                              % metastable states
     options.Track = false    % collect and return convergence data
-    options.Eulerian = false % return Eulerian mesh
+    options.Storage_GB = 1;  % maximum data storage
 end
 arguments (Output)
     return_time (1,:)   % discretized time axis of simulation
-    return_data         % simulation results: [time,data]
+    return_mesh         % evolving mesh
+    return_mass         % shift in mass corresponding to mesh
     return_clock        % total real-time for simulation
     return_conv         % convergence data
     return_end          % end by convergence or walltime
@@ -40,20 +41,16 @@ end
     % Process Inputs
     %****************************
 
-    d0 = initial;                  % collect density
-    N_eul = length(d0);            % number of cells (particles)
-    ic = 0:1/N_eul:1-1/N_eul;      % cell boundaries  
-
-    % mass in each cell by linear approximation of density
-    mass_curr = ([d0(2:end) + d0(1:end-1), d0(1) + d0(end)] .* ...
-                 [ic(2:end) - ic(1:end-1), mod(ic(1) - ic(end),1)])/2;
+    % extract initial conditions
+    ic = squeeze(ic_data(1,:));
+    mass_curr = squeeze(ic_data(2,:));
+    num_par = length(ic);
 
     % collect numerical parameters
     t_final = options.EndTime;
     ud = options.Update;
     tol = options.Tolerance;
     trak = options.Track;
-    eul = options.Eulerian;
 
     %****************************
     % Change coordinate System
@@ -64,12 +61,13 @@ end
     r1_tilde = mod(params.r1 - params.r2,1);
     s1_tilde = mod(params.s1 - params.r2,1);
     s2_tilde = mod(params.s2 - params.r2,1);
-    [~, shift_ind] = min(abs(ic-params.r2));  % to undo shift later
     ic = mod(ic-params.r2,1);
     j = find(diff(ic)<0,1);
+    mass_shift = 0;
     if ~isempty(j)
         ic = [ic(j+1:end), ic(1:j)];
         mass_curr = [mass_curr(j+1:end),mass_curr(1:j)];
+        mass_shift = j;
     end
 
     %****************************
@@ -77,37 +75,33 @@ end
     %****************************
     % Set up initial state and instantiate counters and storage objects.
 
-    % Scheme requires 'particles' to be ordered.
-    % Saving labels helps monitor mass
-    d = ic;
-    tt = 0;                   % current time
-
     % Instantiate storage objects according to whether user calls for data
     % at every revolution or only the final state.
     collect = options.Collect;
     if collect
-        time = zeros([1,1000]);                % time vector (dynamic)
-        if eul
-            data = zeros([1000,length(ic)]);   % eul state vector (dynamic)
-        else
-            data = zeros([1000,2,length(ic)]); % lag state vector (dynamic)
-        end
+        max_sav = 2*floor((floor(options.Storage_GB*2^30 / (num_par*8))-1)/2)+1;
+        time = zeros([max_sav,1]);               % time vector
+        mesh_data = zeros([max_sav,num_par]);    % lag state vector
+        mass_data = zeros([max_sav,1]);          % mass vector
     else
-        time = zeros([2,1]);                % time vector (static)
-        if eul
-            data = zeros([2,length(ic)]);   % eul state vector(static)
-        else
-            data = zeros([2,2,length(ic)]); % lag state vector (static)
-        end
+        time = zeros([2,1]);                     % time vector
+        mesh_data = zeros([2,num_par]);     % lag state vector
+        mass_data = zeros([2,1]);                % mass vector
     end
-    conv_data = zeros(size(time));        % convergence vector
+    conv_data = zeros(size(time));               % convergence vector
 
-    rev_c = 1;                            % revolution counter
-    time(rev_c) = tt;                     % save first time (0)
+    rev_c = 0;               % (completed) revolution counter
+    sav_c = 1;               % save counter
+    sav_f = 1;               % save frequency
+    time(sav_c) = 0;         % save first time
+    mass_data(sav_c) = 0;    % save first mass-shift
+
+    full_mesh = ic;    % initial state
+    tt = 0;    % initial time
 
     % Store state at previous revolution (for convergence criterion)
-    [x,rho,atom,mass_cell] = split_sing_cont(d,mass_curr);
-    prior_mesh = x;
+    [coll_mesh,rho,atom,mass_cell] = split_sing_cont(full_mesh,mass_curr);
+    prior_mesh = coll_mesh;
     prior_rho = rho;
     prior_atom = atom;
 
@@ -115,16 +109,9 @@ end
     fxd_dt = s1_tilde;
 
     % Store initial state
-    if eul
-        data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass_curr,...
-                                                    "Rho",rho,...
-                                                    "Atom",atom),...
-                                  shift_ind-1);
-    else
-        [pos_save,mass_save] = lagrange_unshift(d,mass_curr,params.r2);
-        data(rev_c,1,:) = pos_save;
-        data(rev_c,2,:) = mass_save;
-    end
+    [pos_save,undo_shift] = lagrange_unshift(full_mesh,params.r2);
+    mesh_data(sav_c,:) = pos_save;
+    mass_data(sav_c,:) = mod(mass_shift + undo_shift,num_par);
 
     %****************************
     % Iterate
@@ -154,8 +141,8 @@ end
         end
 
         % Split into continuous and singular components
-        x_ext    = [x(end)-1,x,x(1)+1];
-        rho_ext  = [rho(end),rho];
+        x_ext         = [coll_mesh(end)-1,coll_mesh,coll_mesh(1)+1];
+        rho_ext       = [rho(end),rho];
         cont_mass_ext = [mass_cell(end),mass_cell];
 
         % Determine initial population of S
@@ -173,10 +160,10 @@ end
         N0 = N0 + sum(atom(in_ind : out_ind-1));
 
         % Construct entry/exit events relative to S
-        enter_events = s1_tilde-x;
+        enter_events = s1_tilde-coll_mesh;
         enter_inds = enter_events > 0 & enter_events < dt;
         enter_times = flip(enter_events(enter_inds));
-        exit_events = s2_tilde-x;
+        exit_events = s2_tilde-coll_mesh;
         exit_inds = exit_events > 0 & exit_events < dt;
         exit_times = flip(exit_events(exit_inds));
         
@@ -278,8 +265,8 @@ end
 
         % Find particles that interact with R during step
         % In new coords, r2=1 so x<r2 is trivial
-        r_array = d > r1_tilde-dt;
-        r_set = d(r_array);
+        r_array = full_mesh > r1_tilde-dt;
+        r_set = full_mesh(r_array);
         r_ind = find(r_array);
 
         % Compute particles' starting points relative to R
@@ -312,31 +299,30 @@ end
                 k = k + 1;
             end
             if k == length(H) % particle doesn't leave R in step
-                d(r_ind(i)) = base(i) + H(end) - Hcorr(i);
+                full_mesh(r_ind(i)) = base(i) + H(end) - Hcorr(i);
             else              % particle left R during step
                 C = targets(i) - H(k);
                 discr = speeds(k)^2 - 2*params.alph*flux(k)*C;
                 exit_time = times(k) + 2*C / (speeds(k) + sqrt(discr));
-                d(r_ind(i)) = dt - exit_time;
+                full_mesh(r_ind(i)) = dt - exit_time;
             end
         end
 
         % Compute displacement of all particles that do not interact with R
-        d(~r_array) = d(~r_array) + dt;
+        full_mesh(~r_array) = full_mesh(~r_array) + dt;
 
         % Correct for periodicity
-        d = mod(d,1);
+        full_mesh = mod(full_mesh,1);
 
-        % Resort state vector to ensure monotonicity, and update labels
-        % accordingly.
-        j = find(diff(d)<0,1);
+        % Re-sort state vector to ensure monotonicity
+        j = find(diff(full_mesh)<0,1);
         if ~isempty(j)
-            d = [d(j+1:end), d(1:j)];
+            full_mesh = [full_mesh(j+1:end), full_mesh(1:j)];
             mass_curr = [mass_curr(j+1:end),mass_curr(1:j)];
-            %labels = [labels(j+1:end), labels(1:j)];
+            mass_shift = mod(mass_shift + j,num_par);
         end
 
-        [x,rho,atom,mass_cell] = split_sing_cont(d,mass_curr);
+        [coll_mesh,rho,atom,mass_cell] = split_sing_cont(full_mesh,mass_curr);
 
         % Update current time
         tt = tt + dt;
@@ -347,42 +333,14 @@ end
 
             rev_c = rev_c+1;
 
-            % Update data storage
-            if collect
-                time(rev_c) = tt;
-                if eul
-                    data(rev_c,:) = circshift(lagrange_to_euler(d,ic,mass_curr),...
-                                              shift_ind-1);
-                else
-                    [pos_save,mass_save] = lagrange_unshift(d,mass_curr,params.r2);
-                    data(rev_c,1,:) = pos_save;
-                    data(rev_c,2,:) = mass_save;
-                end
-                
-                % Check if storage vectors need to be extended
-                if rev_c == length(time)
-                    time(end + 1000) = 0;
-                    conv_data(end + 1000) = 0;
-                    if eul 
-                        data(end + 1000,:) = 0;
-                    else
-                        data(end + 1000,:,:) = 0;
-                    end
-                end
-            end
-
             % Compute difference between points of Poincare map
-            change = metric_wasserstein1_lag(x,mass_curr,...
+            change = metric_wasserstein1_lag(coll_mesh,mass_curr,...
                                              prior_mesh,mass_curr,...
                                              'Rho1',rho,'Atom1',atom,...
                                              'Rho2',prior_rho,'Atom2',prior_atom);
-            prior_mesh = x;
+            prior_mesh = coll_mesh;
             prior_rho = rho;
             prior_atom = atom;
-
-            if trak
-                conv_data(rev_c) = change;
-            end
 
             % Check for convergence
             converged = change < tol;
@@ -390,6 +348,33 @@ end
             % Give progress update (if desired).
             if ud && (mod(rev_c,10) == 0)
                 fprintf('Reached revolution %d at in-game time %.2f and real time %.2f\n',rev_c,tt,toc(timer));
+            end
+
+            % Update data
+            if collect && (converged || (mod(rev_c,sav_f) == 0))
+
+                sav_c = sav_c + 1;
+                time(sav_c) = tt;
+                [pos_save,undo_shift] = lagrange_unshift(full_mesh,params.r2);
+                mesh_data(sav_c,:) = pos_save;
+                mass_data(sav_c) = mod(mass_shift + undo_shift,num_par);
+                if trak
+                    conv_data(sav_c) = change;
+                end
+
+                % Update storage objects
+                if sav_c == max_sav
+                    sav_c = (max_sav+1)/2;
+                    for k = 2:sav_c
+                        src = 2*k-1;
+                        time(k) = time(src);
+                        mass_data(k) = mass_data(src);
+                        mesh_data(k,:) = mesh_data(src,:);
+                        conv_data(k,:) = conv_data(src,:);
+                    end
+                    sav_f = 2*sav_f;
+                end
+                
             end
 
         end % of revolution block
@@ -401,34 +386,19 @@ end
 
         % store ending time and data according to original positions
         time(2) = tt;
-        if eul
-            data(2,:) = circshift(lagrange_to_euler(d,ic,mass_curr),...
-                                  shift_ind-1);
-        else
-            [pos_save,mass_save] = lagrange_unshift(d,mass_curr,params.r2);
-            data(2,1,:) = pos_save;
-            data(2,2,:) = mass_save;
-        end
+        [pos_save,undo_shift] = lagrange_unshift(full_mesh,params.r2);
+        mesh_data(2,:) = pos_save;
+        mass_data(2) = mod(mass_shift + undo_shift,num_par);
     end
 
     % Stop timer
     end_time = toc(timer);
 
-    % Return data, truncating storage objects appropriately and reverting
-    % the change of coordinates
-    if collect
-        return_time = time(1:rev_c);
-        return_conv = conv_data(2:rev_c);
-        if eul
-            return_data = data(1:rev_c,:);
-        else
-            return_data = data(1:rev_c,:,:);
-        end
-    else
-        return_time = time;
-        return_conv = conv_data(2:end);
-        return_data = data;
-    end
+    % Return data
+    return_time = time(1:sav_c);
+    return_conv = conv_data(1:sav_c);
+    return_mesh = mesh_data(1:sav_c,:);
+    return_mass = mass_data(1:sav_c,:);
     return_clock = end_time;
 
     % Give progress update (if desired).
@@ -456,19 +426,18 @@ end % of main function
 % HELPER FUNCTION(S)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [x,mass_out] = lagrange_unshift(d,mass_in,r2)
+function [x,mass_out] = lagrange_unshift(d,r2)
 %LAGRANGE_UNSHIFT un-does the initial shift in coordinates. It's only given
 %its own function to clean up the code.
 %
 %last updated 10/05/26 by Adam Petrucci
 
     x = mod(d+r2,1);
+    mass_out = 0;
     j = find(diff(x)<0,1);
     if ~isempty(j)
         x = [x(j+1:end),x(1:j)];
-        mass_out = [mass_in(j+1:end),mass_in(1:j)];
-    else
-        mass_out = mass_in;
+        mass_out = j;
     end
 
 end

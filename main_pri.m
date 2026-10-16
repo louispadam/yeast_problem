@@ -35,14 +35,26 @@ ic = @(z) ic_s(z)/s_n;
 generate_sample = construct_sampler(ic);
 ic_c = ic(x);
 
+lag_data = euler_to_lagrange(ic_mesh,ic_c);
+
+
 disp('Prepared Initial Data')
 
 %% For Research Statement
 
 % Run mean-field simulation
-[time_mf, data_mf, ~, ~, end_mf] = ...
-                         cont_cons_lag(ic_c,parameters,...
-                                       "Collect",true);
+[time_mf, mesh_mf, mass_mf, ~, conv_mf, end_mf] = ...
+                         cont_cons_lag(lag_data,parameters,...
+                                       "EndTime",Inf,...
+                                       "Collect",true,...
+                                       "Track",true);
+
+%%
+
+fc_mass = circshift(ic_mass,-mass_mf(end));
+fc_eul = lagrange_to_euler(squeeze(mesh_mf(end,:)),x,fc_mass);
+
+disp('done')
 
 %%
 
@@ -79,7 +91,7 @@ frame(x,parameters,ic_ax,Data={ic_p,...
                               Region_labels=true,...
                               Title="Initial State");
 
-exportgraphics(ic_figure,'ic_figure.pdf','ContentType','vector')
+%exportgraphics(ic_figure,'ic_figure.pdf','ContentType','vector')
 
 fc_figure = figure(2);
 clf(fc_figure);
@@ -87,9 +99,6 @@ fc_ax = gca(fc_figure);
 
 fc_figure.Units = 'inches';
 fc_figure.Position = [1 1 5.5 3.5];
-
-fc_eul = lagrange_to_euler(squeeze(data_mf(end,1,:)),x,...
-                           squeeze(data_mf(end,2,:)));
 
 frame(x,parameters,fc_ax,Data={squeeze(data_node(end,:)),...
                                fc_eul},...
@@ -105,7 +114,7 @@ frame(x,parameters,fc_ax,Data={squeeze(data_node(end,:)),...
                               Region_labels=true,...
                               Title="Final State");
 
-exportgraphics(fc_figure,'fc_figure.pdf','ContentType','vector')
+%exportgraphics(fc_figure,'fc_figure.pdf','ContentType','vector')
 
 %% Little experiment
 
@@ -271,7 +280,7 @@ clf(ic_lag_figure);
 ic_lag_ax = gca(ic_lag_figure);
 
 frame_cumsum(parameters,ic_lag_ax,Data={[ic_p;ones(size(ic_p))/num_par],...
-                                    [x;ic_c.*([x(2:end),x(1)+1]-x)]},...
+                                        [x;ic_c.*([x(2:end),x(1)+1]-x)]},...
                               Meta={struct(name="node",...
                                            color=node_color),...
                                     struct(name="mefi",...

@@ -1,7 +1,5 @@
 function return_data = lagrange_to_euler(lag_coord, eul_coord, mass, options)
-%LAGRANGE_TO_EULER converts lagrangian coordinates to the original eulerian
-%coordinates in which initial data were given. This is purely for
-%presentation, it does not impact the algorithm.
+%LAGRANGE_TO_EULER converts lagrangian coordinates to eulerian coordinates.
 %
 %last updated 10/08/26 by Adam Petrucci
 arguments (Input)
@@ -14,7 +12,7 @@ arguments (Input)
     options.Atom = []
 end
 arguments (Output)
-    return_data      % Wasserstein distance
+    return_data
 end
 
     rho = options.Rho;
