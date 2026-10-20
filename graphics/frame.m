@@ -3,7 +3,7 @@ function return_data = frame(x_data,params,axis,options)
 % array, each element of which is a vector or discretized continuum of
 % particles.
 %
-%last updated 10/05/25
+%last updated 10/18/25
 arguments (Input)
     x_data (1,:) double     % discretization of domain
     params struct       % parameters used for simulation
@@ -15,7 +15,7 @@ arguments (Input)
     options.Data = {}                       % data to plot
     options.Meta = {}                       % meta data: struct with
                                                 % name (string)
-                                                % discrete (boolean)
+                                                % type
                                                 % color (rgb)
                                                 % thickness (double)
     options.Title = ""                      % title of axis
@@ -48,8 +48,11 @@ end
         arr = data{k};
 
         % if discrete data, thicken
-        if meta{k}.discrete
+        if strcmp(meta{k}.type,"discrete")
             arr = fatten_points_polynomial(x,arr,meta{k}.thickness);
+        end
+        if strcmp(meta{k}.type,"lagrangian")
+            arr = lagrange_to_euler(squeeze(arr(1,:)),x,squeeze(arr(2,:)));
         end
 
         to_plot(k,:) = arr;

@@ -50,18 +50,27 @@ end
     to_send = cell([1,length(data)]);
     for k = 1:length(data)
         arr = data{k};
-        to_send{k} = arr(1,:);
+        if strcmp(meta{k}.type,"lagrangian")
+            to_send{k} = [arr(2,2:end);arr(1,2:end)];
+        else % "discrete" or "eulerian"
+            to_send{k} = arr(1,:);
+        end
     end
     frame(x_data,params,ax, ...
           Data = to_send, ...
           Meta = meta, ...
           Title = options.Title, ...
-          Legend = options.Legend, ...
-          Regions = reg, ...
-          Region_labels = options.Region_labels);
-    if reg
-        ChiR = params.ct(params.r1,params.r2);
-        ChiS = params.ct(params.s1,params.s2);
+          Legend = false, ...
+          Regions = false, ...
+          Region_labels = false);
+    if options.Regions
+        patches = shade_regions(ax,params,"Region_Labels",options.Region_labels);
+        patch_r = patches(1);
+        patch_s = patches(2);
+    end
+
+    if options.Legend
+        legend show
     end
 
     % Set up annotation for time-keeping
@@ -82,20 +91,24 @@ end
 
     handles = findobj(ax,'Type','line');
 
+    m=0;
+
     for ind = 1:length(time)
 
-        if mod(ind, ptfac) == 0 % I should be able to speed this up by
-                                % putting it in the for loop
+        if mod(ind, ptfac) == 0
 
             % Collect slices of data for current frame
-            b = length(data) + 2 * reg;
-            m = 0;
+            b = length(data);
             for k = 1:length(data)
                 arr = data{k};
-                if meta{k}.discrete
+                if strcmp(meta{k}.type,"discrete")
                     handles(b).YData = fatten_points_polynomial(x_data,arr(ind,:),meta{k}.thickness);
-                else
+                elseif strcmp(meta{k}.type,"eulerian")
                     handles(b).YData = arr(ind,:);
+                else % strcmp(meta{k}.type,"lagrangian")
+                    lag_coord = squeeze(arr(ind+1,2:end));
+                    lag_mass = squeeze(circshift(arr(1,2:end),-arr(ind+1,1)));
+                    handles(b).YData = lagrange_to_euler(lag_coord,x_data,lag_mass);
                 end
                 m_temp = max(handles(b).YData,[],"all");
                 if m_temp > m
@@ -109,14 +122,11 @@ end
                 a.String = sprintf('Time: %.2f',time(ind));
             end
 
-            % update height of regions to match data
-            if ax.YLim < m
-                ax.YLim = [0 m*1.1];
-                if reg
-                    handles(2).YData = 1.1*m*ChiR(x_data);
-                    handles(1).YData = 1.1*m*ChiS(x_data);
-                end
-            end
+            ax.YLim = [0 m*1.1];
+            yl = ylim(ax);
+            patch_r.YData = [yl(1) yl(1) yl(2) yl(2)];
+            patch_s.YData = [yl(1) yl(1) yl(2) yl(2)];
+
             writeVideo(v, getframe(fig));
 
         end

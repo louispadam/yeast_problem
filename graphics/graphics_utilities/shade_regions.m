@@ -1,7 +1,7 @@
-function shade_regions(ax,params,options)
+function return_data = shade_regions(ax,params,options)
 %SHADE_REGIONS colors in the R and S regions on figures
 %
-%last updated 08/25/26 by Adam Petrucci
+%last updated 10/18/26 by Adam Petrucci
 arguments (Input)
     ax      % the axis to shade in
     params  % parameters defining R and S
@@ -37,5 +37,7 @@ end
 
     uistack(patch_r,'bottom')
     uistack(patch_s,'bottom')
+
+    return_data = [patch_r,patch_s];
 
 end
