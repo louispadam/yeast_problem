@@ -15,6 +15,7 @@ arguments (Input)
     options.N = [1000, 2000]            % number of particles
     options.Save_Data = "N"             % title to use if saving data
     options.Trials = 10                 % NODE runs / MF runs
+    options.Track_Times = true          % record simulation durations
 
     % For the following, L2 = s2 - s1, L3 = r1 - s2, and L4 = r2 - r1.
     % *_start is the value at which the parameter should start, and
@@ -74,6 +75,9 @@ end
     % Run Simulations
     %****************************
 
+    time_record = fopen(save_data+"_time_record.txt",'w');
+    fprintf(time_record,'s1 s2 r1 r2 type N trial runtime_seconds\n');
+
     % start timer
     exp_timer = tic;
 
@@ -122,12 +126,17 @@ end
                 %try
 
                     % Run mean-field simulation
-                    [time_mf, data_mf, ~, ~, end_mf] = ...
+                    [time_mf, data_mf, clock_mf, ~, end_mf] = ...
                             cont_cons_lag(ic_c,parameters,...
-                                            "Update",false,...
+                                            "Update",true,...
                                             "Collect",true, ...
                                             "Track",false, ...
                                             "EndTime",max_simulation_time);
+
+                    fprintf(time_record,'%.2f %.2f %.2f %.2f %s %d %d %.6f\n', ...
+                            parameters.s1,parameters.s2,...
+                            parameters.r1,parameters.r2,...
+                            'mefi',0,1,clock_mf);
 
                     % Detect clusters of mean-field simulation
                     clusters_mf = track_clusters(time_mf,data_mf,...
@@ -207,12 +216,17 @@ end
                         %try
 
                             % Run NODE simulation
-                            [time_node, data_node, ~, ~, end_node] = ...
+                            [time_node, data_node, clock_node, ~, end_node] = ...
                                 particle_proof(ic_p,parameters, ...
-                                                "Update",false,...
+                                                "Update",true,...
                                                 "Collect",true,...
                                                 "Track",false,...
                                                 "EndTime",max_simulation_time);
+
+                            fprintf(time_record,'%.2f %.2f %.2f %.2f %s %d %d %.6f\n', ...
+                                parameters.s1,parameters.s2,...
+                                parameters.r1,parameters.r2,...
+                                'node',N(n),t,clock_node);
 
                             % Detect clusters of NODE simulation
                             clusters_node = ...
@@ -280,7 +294,7 @@ end
 
                 % Save, if requested
                 if ~strcmp(save_data,"N")
-                    save(save_data,"exp_colec");
+                    save(save_data+".mat","exp_colec");
                     %save("error_mf_" + save_data, "error_data_mf");
                     %save("error_node_" + save_data, "error_data_node");
                 end
@@ -292,6 +306,8 @@ end
     %end % for L2
 
     end % of experiment for all parameter sets
+
+    fclose(time_record);
 
     return_data = exp_colec;
 
