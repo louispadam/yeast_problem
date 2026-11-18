@@ -12,7 +12,7 @@ arguments (Input)
     options.Data = {}                       % data to plot
     options.Meta = {}                       % meta data: struct with
                                                 % name (string)
-                                                % discrete (boolean)
+                                                % type (boolean)
                                                 % color (rgb)
                                                 % thickness (double)
     options.Time = []
@@ -33,7 +33,6 @@ end
     ax = axes(fig);
 
     % Optional Inputs
-    reg = options.Regions;
     data = options.Data;
     meta = options.Meta;
     time = options.Time;

@@ -7,7 +7,7 @@ function [return_time, return_mesh, return_mass, return_clock, return_conv, ...
 %
 %last updated 10/16/26 by Adam Petrucci
 arguments (Input)
-    ic_data            % initial mesh and mass
+    ic_data            % initial [mesh; mass]
     params             % parameters for simulation
 end
 arguments (Input)

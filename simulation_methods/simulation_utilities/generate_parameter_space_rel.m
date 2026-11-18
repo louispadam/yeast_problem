@@ -1,11 +1,10 @@
-function return_data = generate_parameter_space(L1, L2, L3, options)
+function return_data = generate_parameter_space_rel(L1, L2, L3, options)
 %GENERATE_PARAMETER_SPACE helps generate a parameter space to explore with
 %big_experiment. L1, L2, and L3 are vectors each containing the range of
 %some parameter value to explore. This function automatically builds a
 %matrix of admissible parameter sets from those vectors.
 %
 %last updated 09/04/26 by Adam Petrucci
-
 arguments (Input)
     L1         % range of distances between s1 and s2
     L2         % range of distances between s1 and r1

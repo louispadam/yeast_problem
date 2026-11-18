@@ -1,4 +1,4 @@
-function return_data = postprocess_big_experiment_old(exp_data)
+function return_data = reorganize_big_experiment_old(exp_data)
 %POSTPROCESS_BIG_EXPERIMENT_OLD
 %
 %last updated 10/20/26 by Adam Petrucci
