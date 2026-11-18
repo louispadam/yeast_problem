@@ -36,12 +36,9 @@ ic_func_norm = @(z) ic_func(z)/for_norm;
 generate_sample = construct_sampler(ic_func_norm);
 ic_eval_norm = ic_func_norm(x);
 
-<<<<<<< Updated upstream
 ic_lag = euler_to_lagrange(x,ic_eval_norm);
 ic_mass = ic_lag(2,:);
 
-=======
->>>>>>> Stashed changes
 disp('Prepared Initial Data')
 
 %% Generate Parameter Space
